@@ -136,6 +136,80 @@ A pasta está no `.gitignore` — o conteúdo é seu e não vai para o repositó
 
 ---
 
+## Publicação no Streamlit Community Cloud
+
+O disco desses serviços é efêmero: a cada redeploy o container é recriado e o
+DuckDB some. Por isso os dados viajam como **Parquet versionados** em
+`data/snapshots/`, atualizados pelo GitHub Actions. Ao subir, o aplicativo
+detecta o banco vazio e se hidrata a partir deles em segundos.
+
+Os arquivos são **particionados por mês**: só o do mês corrente muda a cada
+coleta, e os anteriores ficam byte a byte idênticos. É o que impede o histórico
+do repositório de inchar — um arquivo único por tabela, reescrito diariamente,
+custaria mais de um gigabyte por ano.
+
+### Passo 1 — carga inicial
+
+Guarde a chave do FRED em **Settings → Secrets and variables → Actions**, com o
+nome `FRED_API_KEY`. Depois vá em **Actions → Coleta de dados → Run workflow** e
+informe `since = 2015-01-01`.
+
+É a execução longa (a diária leva poucos minutos). Ao terminar, confira no log
+o resultado de `tesouraria status` e verifique que houve um commit em
+`data/snapshots/`. A partir daí o workflow roda sozinho todo dia útil às 20h
+(23h UTC), depois do fechamento no Brasil e nos Estados Unidos.
+
+Duas fontes se comportam diferente no backfill: **ANBIMA e B3 publicam um
+arquivo por pregão**, então coletá-las desde 2015 seriam milhares de
+requisições. Elas têm um teto de `max_dias_por_execucao` em
+`config/sources.yaml` e vão acumulando histórico dia a dia. O histórico longo da
+curva brasileira vem do Tesouro Direto, que entrega tudo num CSV só.
+
+### Passo 2 — criar o app
+
+Em <https://share.streamlit.io> → **New app**:
+
+| Campo | Valor |
+|---|---|
+| Repositório | `ffalvess/analise_tesouraria` |
+| Branch | `main` |
+| Main file path | `src/tesouraria/ui/app.py` |
+| Python version (*Advanced settings*) | **3.11** |
+
+Em **Advanced settings → Secrets**, cole:
+
+```toml
+TESOURARIA_FRED_API_KEY = "sua-chave-do-fred"
+```
+
+O aplicativo copia os secrets para variáveis de ambiente no boot, então não
+importa se a plataforma os expõe dessa forma ou não.
+
+### Duas ressalvas
+
+- **O repositório é privado.** O Community Cloud precisa de autorização do
+  GitHub com acesso a repositórios privados, e vale conferir o limite de apps
+  privados do seu plano antes de contar com ele. Se preferir tornar o
+  repositório público, não há segredo no código — tudo vem de `.env` e dos
+  secrets — mas os dados de mercado passariam a ser públicos também.
+- **Memória.** O plano gratuito oferece cerca de 1 GB, folgado para o volume
+  atual. `documentos` é a tabela que mais cresce com o tempo, porque guarda o
+  texto integral dos discursos (necessário para a busca da página de
+  comunicação). Se um dia apertar, é o primeiro lugar a olhar.
+
+### Snapshots pela linha de comando
+
+```bash
+tesouraria snapshot export     # banco -> data/snapshots/
+tesouraria snapshot import     # data/snapshots/ -> banco
+```
+
+**Nunca commite snapshots gerados em modo offline.** Se acontecer, o aplicativo
+avisa: `ingest_log.modo` viaja junto no snapshot, e um banner de *dados
+sintéticos* aparece em todas as telas, nomeando as fontes afetadas.
+
+---
+
 ## ⚠️ Checklist de validação dos endpoints
 
 **Leia isto antes da primeira execução com rede aberta.**
@@ -177,31 +251,41 @@ Uma fonte que falha não derruba as outras nem o aplicativo: o erro fica em
 
 ```bash
 ruff check src tests scripts     # lint
-pytest -q                        # 125 testes, todos offline
+pytest -q                        # 144 testes, todos offline
 pytest --cov=tesouraria          # com cobertura
 ```
 
 Nenhum teste toca a rede nem o banco do usuário. Eles cobrem os parsers de cada
 fonte contra as fixtures, a conversão de convenção de taxa com valores
 calculados à mão, a interpolação, os diferenciais, o tom, a idempotência da
-gravação e — via `streamlit.testing` — a renderização real das dez telas.
+gravação, a ida e volta dos snapshots (com verificação de determinismo por
+hash) e — via `streamlit.testing` — a renderização real das dez telas, incluindo
+a hidratação automática a partir dos Parquet.
+
+O GitHub Actions roda lint e testes a cada push, no mesmo `requirements.txt`
+que o Community Cloud usa: se a resolução de dependências quebrar, quebra na CI
+antes de chegar ao app publicado.
 
 ### Estrutura
 
 ```
+.github/workflows/  ci.yml (lint e testes) e dados.yml (coleta agendada)
 config/           sources.yaml, feeds.yaml e os léxicos de tom
+requirements.txt  o que o Streamlit Community Cloud instala
 scripts/          gerador das amostras sintéticas
 src/tesouraria/
   settings.py     configuração e caminhos
   http.py         cliente HTTP com retry e cache em disco
   db.py           DuckDB: esquema e upsert idempotente
+  snapshots.py    Parquet particionado por mês, para publicar
   queries.py      camada única de leitura
-  cli.py          tesouraria ingest | status | serve
+  cli.py          tesouraria ingest | status | snapshot | serve
   sources/        uma fonte por arquivo (fetch e parse separados)
   analytics/      curve, differentials, fxflow, tone
   ui/             app.py, charts.py e as nove páginas
 data/
   fixtures/       amostras sintéticas (versionadas)
+  snapshots/      dados reais em Parquet, atualizados pelo Actions
   research_pdfs/  seus PDFs (ignorado pelo git)
   tesouraria.duckdb   banco local (ignorado pelo git)
 ```

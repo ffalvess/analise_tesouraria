@@ -1,0 +1,126 @@
+name: Coleta de dados
+
+# Coleta as fontes, atualiza os snapshots Parquet e os commita. É o que mantém
+# o aplicativo publicado com dados frescos: o disco do Streamlit Community
+# Cloud é efêmero, então o banco é reconstruído a partir destes arquivos a cada
+# container novo.
+#
+# Backfill inicial: rode manualmente (Run workflow) com since = 2015-01-01.
+
+on:
+  schedule:
+    # 23h UTC = 20h BRT, em dias úteis — depois do fechamento no Brasil e nos
+    # Estados Unidos (19h ET). O cron do GitHub é sempre em UTC.
+    - cron: "0 23 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Data inicial da coleta (AAAA-MM-DD). Vazio = últimos 7 dias."
+        required: false
+        type: string
+
+concurrency:
+  group: coleta-de-dados
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    # O backfill desde 2015 é longo; a execução diária leva poucos minutos.
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Definir a janela de coleta
+        id: janela
+        run: |
+          if [ -n "${{ inputs.since }}" ]; then
+            echo "since=${{ inputs.since }}" >> "$GITHUB_OUTPUT"
+          else
+            # Sete dias de sobreposição: as fontes revisam números publicados,
+            # e o upsert por chave primária substitui em vez de duplicar.
+            echo "since=$(date -u -d '7 days ago' +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Carregar o histórico já versionado
+        # Parte do que existe no repositório, para que a coleta seja
+        # incremental em vez de recomeçar do zero a cada execução.
+        run: tesouraria snapshot import
+
+      - name: Coletar as fontes
+        env:
+          TESOURARIA_FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: tesouraria ingest --all --since ${{ steps.janela.outputs.since }}
+
+      - name: Situação por fonte
+        run: tesouraria status
+
+      - name: Exportar os snapshots
+        run: tesouraria snapshot export
+
+      - name: Commitar se algo mudou
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/snapshots
+          if git diff --staged --quiet; then
+            echo "Nenhuma mudança nos dados; nada a commitar."
+          else
+            git commit -m "Atualiza dados: coleta de $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Verificar as fontes primárias
+        # Roda por último, de propósito: os dados já foram salvos e commitados,
+        # e a falha aqui serve de alerta, não de bloqueio.
+        #
+        # Só as duas curvas primárias derrubam o job. As demais fontes registram
+        # o erro em ingest_log, que a interface mostra no rodapé; falhar o build
+        # por causa da ANBIMA transformaria o alerta em ruído diário.
+        run: |
+          python - <<'PY'
+          import sys
+          from tesouraria import db
+
+          PRIMARIAS = {"tesouro_direto", "us_treasury"}
+
+          status = db.status_report()
+          if status.empty:
+              sys.exit("Nenhuma ingestão foi registrada.")
+
+          status = status.set_index("fonte")
+          problemas = []
+          for fonte in sorted(PRIMARIAS):
+              if fonte not in status.index:
+                  problemas.append(f"{fonte}: não executou")
+              elif status.loc[fonte, "status"] == "erro":
+                  problemas.append(f"{fonte}: {status.loc[fonte, 'erro']}")
+
+          outras = status[status["status"].isin(["erro", "pulado"])]
+          for fonte, linha in outras.iterrows():
+              if fonte not in PRIMARIAS:
+                  print(f"aviso — {fonte}: {linha['status']} ({linha['erro']})")
+
+          if problemas:
+              sys.exit(
+                  "As curvas primárias falharam:\n  "
+                  + "\n  ".join(problemas)
+                  + "\n\nConfira as URLs em config/sources.yaml."
+              )
+          print("As duas curvas primárias foram coletadas.")
+          PY
