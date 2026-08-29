@@ -1,0 +1,12 @@
+# Tema e comportamento da interface. Segredos NÃO vão aqui — use .env
+# (este diretório tem .streamlit/secrets.toml no .gitignore).
+
+[theme]
+primaryColor = "#2F6FED"
+base = "light"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

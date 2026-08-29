@@ -1,0 +1,35 @@
+# Segredos e configuracao local
+.env
+.env.local
+.streamlit/secrets.toml
+
+# Dados gerados em tempo de execucao
+data/*.duckdb
+data/*.duckdb.wal
+data/cache/
+data/research_pdfs/*
+!data/research_pdfs/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Ferramentas
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Sistema operacional / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
