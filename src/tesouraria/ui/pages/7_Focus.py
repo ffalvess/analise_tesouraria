@@ -74,7 +74,7 @@ st.plotly_chart(
         titulo=f"Como a projeção de {indicador} evoluiu a cada coleta",
         eixo_y=indicador,
     ),
-    use_container_width=True,
+    width="stretch",
 )
 st.caption(
     "Cada linha é um ano-calendário projetado. Uma linha que sobe consistentemente "
@@ -103,7 +103,7 @@ with aba_dispersao:
             eixo_y=indicador,
             cores=[charts.BR, charts.CINZA, charts.CINZA],
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
     st.plotly_chart(
@@ -113,7 +113,7 @@ with aba_dispersao:
             eixo_y="Desvio padrão",
             cores=[charts.AMBAR],
         ),
-        use_container_width=True,
+        width="stretch",
     )
     st.caption(
         "Dispersão crescente indica que o mercado deixou de concordar sobre o cenário — "
@@ -141,7 +141,7 @@ with aba_top5:
                 eixo_y=indicador,
                 cores=[charts.BR, charts.ROXO],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             "Quando o Top 5 se descola do consenso, costuma ser o consenso que se move "
@@ -182,7 +182,7 @@ with aba_curva:
                 sufixo="%",
                 cores=[charts.ROXO, charts.BR],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             "As duas séries não são idênticas por construção: a curva embute prêmio de "

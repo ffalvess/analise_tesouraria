@@ -8,24 +8,83 @@ o arquivo várias vezes.
 from __future__ import annotations
 
 import datetime as dt
+import os
 
 import pandas as pd
 import streamlit as st
 
-from tesouraria import db, queries
+from tesouraria import db, queries, snapshots
 from tesouraria.settings import get_settings
 
 TTL = 300  # segundos
 
 
+@st.cache_resource(show_spinner="Preparando os dados…")
+def preparar_ambiente() -> dict[str, int]:
+    """Prepara o container antes da primeira consulta. Roda uma vez por processo.
+
+    Faz duas coisas necessárias para publicar o aplicativo:
+
+    1. **Segredos viram variáveis de ambiente.** As `Settings` leem o ambiente
+       via pydantic-settings; copiar `st.secrets` para `os.environ` antes do
+       primeiro `get_settings()` faz a chave do FRED chegar até elas sem
+       depender de o serviço de hospedagem expor secrets como variáveis.
+    2. **Hidratação a partir dos snapshots.** O disco do Streamlit Community
+       Cloud é efêmero: a cada container novo o DuckDB nasce vazio. Se houver
+       Parquet versionados em `data/snapshots/`, o banco é reconstruído a
+       partir deles em segundos, em vez de exigir uma coleta completa.
+    """
+    try:
+        segredos = dict(st.secrets)
+    except Exception:  # noqa: BLE001 — sem arquivo de secrets, o normal em uso local
+        segredos = {}
+
+    novos = False
+    for chave, valor in segredos.items():
+        if isinstance(valor, str) and chave not in os.environ:
+            os.environ[chave] = valor
+            novos = True
+    if novos:
+        get_settings.cache_clear()
+
+    if not snapshots.tem_snapshots() or not _banco_vazio_sem_cache():
+        return {}
+
+    with db.connection() as con:
+        resumo = snapshots.importar(con)
+
+    # As consultas passam por `st.cache_data`; sem limpar, as chamadas feitas
+    # antes da hidratação continuariam devolvendo o banco vazio.
+    st.cache_data.clear()
+    return resumo
+
+
+def _banco_vazio_sem_cache() -> bool:
+    """Igual a `banco_vazio`, mas sem passar pelo cache do Streamlit."""
+    try:
+        cobertura = db.table_coverage()
+    except Exception:  # noqa: BLE001 — banco inexistente ou corrompido
+        return True
+    return bool(cobertura.empty or cobertura["linhas"].sum() == 0)
+
+
 def configurar(titulo: str, icone: str = "📈") -> None:
     """Configuração de página e avisos que valem para todas as telas."""
     st.set_page_config(page_title=f"{titulo} · Tesouraria", page_icon=icone, layout="wide")
+    preparar_ambiente()
     st.title(titulo)
-    aviso_offline()
+    aviso_procedencia()
 
 
-def aviso_offline() -> None:
+def aviso_procedencia() -> None:
+    """Avisa quando os números na tela são sintéticos.
+
+    Duas situações levam a isso, e a segunda é a traiçoeira: além do modo
+    offline explícito, o banco pode ter sido hidratado por snapshots que alguém
+    gerou a partir das amostras. Nesse caso o aplicativo roda em modo normal e
+    nada denunciaria a origem — não fosse `ingest_log.modo`, que viaja junto no
+    snapshot e registra se cada fonte veio da rede ou de fixture.
+    """
     if get_settings().offline:
         st.warning(
             "**Modo offline** — os números nesta tela vêm das amostras sintéticas de "
@@ -34,6 +93,28 @@ def aviso_offline() -> None:
             "e reabra o aplicativo sem `TESOURARIA_OFFLINE`.",
             icon="⚠️",
         )
+        return
+
+    fontes = fontes_sinteticas()
+    if fontes:
+        st.warning(
+            f"**Dados sintéticos no banco** — {len(fontes)} fonte(s) foram carregadas a "
+            f"partir das amostras de desenvolvimento, não da rede: "
+            f"`{'`, `'.join(fontes)}`. **Não são dados reais de mercado.** "
+            "Rode `tesouraria ingest --all` com rede aberta para substituí-las.",
+            icon="⚠️",
+        )
+
+
+def fontes_sinteticas() -> list[str]:
+    """Fontes cuja última coleta veio de fixture, e não da rede."""
+    try:
+        status = cache_status()
+    except Exception:  # noqa: BLE001 — banco ausente ou sem registro
+        return []
+    if status.empty or "modo" not in status.columns:
+        return []
+    return sorted(status.loc[status["modo"] == "fixture", "fonte"].tolist())
 
 
 def banco_vazio() -> bool:
@@ -49,11 +130,16 @@ def exigir_dados() -> bool:
     if not banco_vazio():
         return True
     st.info(
-        "Nenhum dado no banco ainda. Rode a ingestão antes de usar o aplicativo:\n\n"
+        "Nenhum dado no banco ainda, e não há snapshots em `data/snapshots/` para "
+        "hidratá-lo. Escolha um caminho:\n\n"
         "```bash\n"
-        "tesouraria ingest --all --since 2015-01-01   # dados reais, exige rede\n"
+        "tesouraria snapshot import                   # reconstrói de Parquet versionado\n"
+        "tesouraria ingest --all --since 2015-01-01   # coleta real, exige rede\n"
         "TESOURARIA_OFFLINE=1 tesouraria ingest --all # amostras sintéticas\n"
-        "```"
+        "```\n\n"
+        "No aplicativo publicado, os snapshots são atualizados pelo GitHub Actions a "
+        "cada dia útil; se esta mensagem aparecer lá, verifique se o workflow "
+        "*Coleta de dados* rodou e commitou."
     )
     return False
 
@@ -143,6 +229,22 @@ def seletor_metodo() -> str:
     )
 
 
+# Preferência de abertura, e não ordem alfabética: `tesouro` é a fonte primária
+# e a única com histórico longo, e `pre` é a curva comparável à Treasury
+# nominal. Sem isso, a tela abriria em `anbima/implicita` e o diferencial do
+# painel confrontaria inflação implícita com juro nominal americano.
+PREFERENCIA_FONTE = ["tesouro", "b3", "anbima"]
+PREFERENCIA_TIPO = ["pre", "ipca", "implicita"]
+
+
+def _ordenar(valores: list[str], preferencia: list[str]) -> list[str]:
+    """Ordena pela preferência; o que não estiver na lista vai para o fim."""
+    return sorted(
+        valores,
+        key=lambda v: (preferencia.index(v) if v in preferencia else len(preferencia), v),
+    )
+
+
 def seletor_fonte_br(chave: str = "fonte_br") -> tuple[str, str]:
     """Escolha de fonte e tipo da curva brasileira, limitada ao que existe."""
     disponivel = cache_fontes_br()
@@ -151,7 +253,7 @@ def seletor_fonte_br(chave: str = "fonte_br") -> tuple[str, str]:
         return "tesouro", "pre"
 
     rotulos_fonte = {"tesouro": "Tesouro Direto", "anbima": "ANBIMA ETTJ", "b3": "Futuros DI (B3)"}
-    fontes = sorted(disponivel["fonte"].unique())
+    fontes = _ordenar(list(disponivel["fonte"].unique()), PREFERENCIA_FONTE)
     fonte = st.sidebar.selectbox(
         "Fonte da curva BR",
         fontes,
@@ -160,7 +262,9 @@ def seletor_fonte_br(chave: str = "fonte_br") -> tuple[str, str]:
     )
 
     rotulos_tipo = {"pre": "Prefixada", "ipca": "IPCA+ (real)", "implicita": "Inflação implícita"}
-    tipos = sorted(disponivel[disponivel["fonte"] == fonte]["tipo"].unique())
+    tipos = _ordenar(
+        list(disponivel[disponivel["fonte"] == fonte]["tipo"].unique()), PREFERENCIA_TIPO
+    )
     tipo = st.sidebar.selectbox(
         "Tipo",
         tipos,
@@ -195,10 +299,10 @@ def rodape() -> None:
             if status.empty:
                 st.write("nenhuma ingestão registrada")
             else:
-                st.dataframe(status, use_container_width=True, hide_index=True)
+                st.dataframe(status, width="stretch", hide_index=True)
         with coluna_dir:
             st.caption("Cobertura das tabelas")
-            st.dataframe(cobertura, use_container_width=True, hide_index=True)
+            st.dataframe(cobertura, width="stretch", hide_index=True)
 
         falhas = status[status["status"].isin(["erro", "pulado"])] if not status.empty else status
         if not falhas.empty:

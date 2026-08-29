@@ -85,7 +85,7 @@ st.plotly_chart(
         "Dólar (R$)",
         titulo=f"Fluxo {segmento} × dólar",
     ),
-    use_container_width=True,
+    width="stretch",
 )
 st.caption(
     "Barras verdes são semanas de entrada líquida; vermelhas, de saída. A leitura útil "
@@ -133,7 +133,7 @@ with aba_regressao:
 
         st.dataframe(
             resultado["coeficientes"].round(6),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.success(resultado["leitura"], icon="📊")
@@ -156,7 +156,7 @@ with aba_beta:
                 eixo_y="Correlação",
                 cores=[charts.AMBAR],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.plotly_chart(
             charts.grafico_series(
@@ -165,7 +165,7 @@ with aba_beta:
                 eixo_y="Beta (% por US$ milhão)",
                 cores=[charts.ROXO],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             "É aqui que se vê **quando** o fluxo explica o câmbio. Trechos em que o beta "
@@ -187,11 +187,11 @@ with aba_acumulado:
                 eixo_y="US$ milhões",
                 cores=[charts.BR, charts.VERDE],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.dataframe(
             charts.arredondar(acumulado.tail(26), 1),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -199,7 +199,7 @@ with aba_segmentos:
     if resumo.empty:
         st.info("Sem dados por segmento.")
     else:
-        st.dataframe(charts.arredondar(resumo, 1), use_container_width=True, hide_index=True)
+        st.dataframe(charts.arredondar(resumo, 1), width="stretch", hide_index=True)
         st.caption("Saldo das últimas 12 semanas por segmento.")
 
     largo = fluxo.copy()
@@ -217,7 +217,7 @@ with aba_segmentos:
                 eixo_y="US$ milhões",
                 cores=[charts.VERDE, charts.US],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             "Separar as duas pernas costuma explicar o caso mais desconcertante da mesa: "

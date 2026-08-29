@@ -54,7 +54,7 @@ with esquerda:
             titulo=f"Curva {tipo} em {data_ref}",
             cores=[charts.CINZA, charts.BR],
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 with direita:
@@ -63,7 +63,7 @@ with direita:
         grade[["prazo_anos", "taxa"]]
         .rename(columns={"prazo_anos": "Prazo (anos)", "taxa": "Taxa (% a.a.)"})
         .round(3),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         height=380,
     )
@@ -71,7 +71,7 @@ with direita:
 st.subheader("Títulos que formam a curva")
 tabela = dados[["instrumento", "vencimento", "prazo_anos", "prazo_du", "taxa", "preco"]].copy()
 tabela.columns = ["Instrumento", "Vencimento", "Prazo (anos)", "Prazo (d.u.)", "Taxa (%)", "PU"]
-st.dataframe(charts.arredondar(tabela, 3), use_container_width=True, hide_index=True)
+st.dataframe(charts.arredondar(tabela, 3), width="stretch", hide_index=True)
 
 # Taxas a termo: separam expectativa de política monetária de prêmio de prazo.
 st.subheader("Taxas a termo implícitas")
@@ -85,7 +85,7 @@ forwards = pd.DataFrame(
         for inicio, fim in janelas
     ]
 )
-st.dataframe(forwards, use_container_width=True, hide_index=True)
+st.dataframe(forwards, width="stretch", hide_index=True)
 st.caption(
     "A taxa a termo responde a: que juro o mercado embute para o período entre dois "
     "vértices? Uma sequência de forwards em queda indica corte de juros já precificado."
@@ -106,7 +106,7 @@ else:
             eixo_y="Taxa (% a.a.)",
             sufixo="%",
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 common.rodape()

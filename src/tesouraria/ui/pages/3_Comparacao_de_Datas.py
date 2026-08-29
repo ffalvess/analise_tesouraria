@@ -105,7 +105,7 @@ st.plotly_chart(
         titulo=f"{descricao} — {len(curvas)} datas sobrepostas",
         cores=charts.degrade(len(curvas), cor_base),
     ),
-    use_container_width=True,
+    width="stretch",
 )
 
 
@@ -121,7 +121,7 @@ if len(objetos) >= 2:
     with esquerda:
         exibir = variacao.copy()
         exibir.columns = ["Prazo (anos)", str(antiga.data_ref), str(recente.data_ref), "Δ (bps)"]
-        st.dataframe(charts.arredondar(exibir), use_container_width=True, hide_index=True, height=420)
+        st.dataframe(charts.arredondar(exibir), width="stretch", hide_index=True, height=420)
 
     with direita:
         st.plotly_chart(
@@ -131,7 +131,7 @@ if len(objetos) >= 2:
                 cores=[charts.VERDE],
                 eixo_y="Variação (bps)",
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
     # Leitura automática do movimento: nível contra inclinação.
@@ -168,7 +168,7 @@ if len(objetos) >= 2:
         matriz = pd.DataFrame(linhas).T
         st.plotly_chart(
             charts.heatmap_variacao(matriz, titulo=f"Variação contra {base.data_ref} (bps)"),
-            use_container_width=True,
+            width="stretch",
         )
 
 common.rodape()

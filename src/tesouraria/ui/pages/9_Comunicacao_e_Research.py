@@ -72,7 +72,7 @@ aba_tom, aba_lista, aba_texto = st.tabs(["Evolução do tom", "Documentos", "Ana
 with aba_tom:
     st.plotly_chart(
         charts.grafico_dispersao_tom(filtrados, titulo="Tom de cada documento"),
-        use_container_width=True,
+        width="stretch",
     )
 
     serie = tone.serie_de_tom(filtrados, janela=5)
@@ -88,7 +88,7 @@ with aba_tom:
                 eixo_y="← dovish   ·   hawkish →",
                 cores=[charts.BR, charts.US, charts.VERDE, charts.ROXO, charts.AMBAR],
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
     # Sobrepor o tom à curva mostra se a comunicação antecedeu o movimento.
@@ -107,7 +107,7 @@ with aba_tom:
                     eixo_y="score",
                     cores=[charts.ROXO],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
         with direita:
             st.plotly_chart(
@@ -118,7 +118,7 @@ with aba_tom:
                     sufixo="%",
                     cores=[charts.BR],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
         st.caption(
             "Se o tom vira antes da curva, a comunicação está guiando o mercado. Se vira "

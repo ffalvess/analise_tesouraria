@@ -46,7 +46,7 @@ def painel(titulo: str, br: pd.DataFrame, us: pd.DataFrame, eixo: str, sufixo: s
                     sufixo=sufixo,
                     cores=[charts.BR],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
     with direita:
         if us.empty:
@@ -63,7 +63,7 @@ def painel(titulo: str, br: pd.DataFrame, us: pd.DataFrame, eixo: str, sufixo: s
                     sufixo=sufixo,
                     cores=[charts.US],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
 
 
@@ -100,7 +100,7 @@ with aba_inflacao:
                 sufixo="%",
                 cores=[charts.BR, charts.US, charts.ROXO],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             "É o diferencial de inflação, e não o nível de cada uma, que sustenta um "
@@ -116,7 +116,7 @@ with aba_inflacao:
                 sufixo="%",
                 cores=[charts.BR],
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
 with aba_emprego:
@@ -135,7 +135,7 @@ with aba_emprego:
                 eixo_y="mil vagas",
                 cores=[charts.US],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             "O payroll é o dado que mais move a ponta curta da curva americana no dia "
@@ -159,7 +159,7 @@ with aba_atividade:
                     eixo_y="índice",
                     cores=[charts.BR],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
     with direita:
         if pib.empty:
@@ -173,7 +173,7 @@ with aba_atividade:
                     sufixo="%",
                     cores=[charts.VERDE],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
 
     if not pmc.empty:
@@ -184,7 +184,7 @@ with aba_atividade:
                 eixo_y="índice",
                 cores=[charts.AMBAR],
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
     reservas = common.cache_serie("4192")
@@ -201,7 +201,7 @@ with aba_atividade:
                     sufixo="%",
                     cores=[charts.VERMELHO],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
             st.caption(
                 "A trajetória fiscal é o fator que mais frequentemente quebra a relação "
@@ -214,7 +214,7 @@ with aba_catalogo:
         "Todas as séries no banco. Para acrescentar outra, inclua o código em "
         "`config/sources.yaml` e rode a ingestão — nenhuma alteração de código é necessária."
     )
-    st.dataframe(catalogo, use_container_width=True, hide_index=True)
+    st.dataframe(catalogo, width="stretch", hide_index=True)
 
     escolhida = st.selectbox(
         "Visualizar uma série",
@@ -231,7 +231,7 @@ with aba_catalogo:
             charts.grafico_series(
                 [(nome, dados)], titulo=f"{nome} ({escolhida})", eixo_y=unidade
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
 common.rodape()

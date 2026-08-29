@@ -69,7 +69,7 @@ with aba_fluxos:
             eixo_y="US$ milhões",
             cores=[charts.VERDE, charts.US],
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
     corrente = pd.merge(
@@ -86,7 +86,7 @@ with aba_fluxos:
             eixo_y="US$ milhões",
             cores=[charts.BR],
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 with aba_saldo:
@@ -106,7 +106,7 @@ with aba_saldo:
                 eixo_y="US$ milhões",
                 cores=[charts.VERDE],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.plotly_chart(
             charts.grafico_series(
@@ -115,7 +115,7 @@ with aba_saldo:
                 eixo_y="US$ milhões",
                 cores=[charts.BR],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             "O acumulado em 12 meses remove a sazonalidade da safra e é a leitura que "
@@ -156,7 +156,7 @@ with aba_relacao:
                 eixo_y="US$ milhões",
                 cores=[charts.VERDE, charts.BR],
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
         juntos = pd.merge(
@@ -177,7 +177,7 @@ with aba_relacao:
                     eixo_y="US$ milhões",
                     cores=[charts.AMBAR],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
             st.caption(
                 "Descasamento positivo e persistente indica exportador segurando dólar no "

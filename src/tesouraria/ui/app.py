@@ -97,7 +97,7 @@ with esquerda:
             titulo="Curva de juros — Brasil",
             cores=[charts.BR],
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 with direita:
@@ -107,7 +107,7 @@ with direita:
             titulo="Curva de juros — Estados Unidos",
             cores=[charts.US],
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 
@@ -121,7 +121,7 @@ with esquerda:
         cores=[charts.VERDE],
         eixo_y="Diferencial (p.p.)",
     )
-    st.plotly_chart(grafico, use_container_width=True)
+    st.plotly_chart(grafico, width="stretch")
 
 with direita:
     documentos = common.cache_documentos(desde=dt.date.today() - dt.timedelta(days=90), limite=8)

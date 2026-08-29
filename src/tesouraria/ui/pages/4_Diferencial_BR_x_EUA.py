@@ -80,7 +80,7 @@ with aba_nominal:
                 titulo="As duas curvas na mesma base",
                 cores=[charts.BR, charts.US],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.plotly_chart(
             charts.grafico_curva(
@@ -89,13 +89,13 @@ with aba_nominal:
                 cores=[charts.VERDE],
                 eixo_y="Diferencial (p.p.)",
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
     with direita:
         exibir = nominal[["prazo_anos", "taxa_br", "taxa_us", "diferencial_bps"]].copy()
         exibir.columns = ["Prazo (anos)", "Brasil (%)", "EUA (%)", "Δ (bps)"]
-        st.dataframe(charts.arredondar(exibir), use_container_width=True, hide_index=True, height=460)
+        st.dataframe(charts.arredondar(exibir), width="stretch", hide_index=True, height=460)
         st.caption(
             "Vértices em branco são aqueles em que uma das curvas não tem observação. "
             "O aplicativo não extrapola: um diferencial ausente é informação diferente "
@@ -129,12 +129,12 @@ with aba_real:
                     titulo="Juro real: Brasil × Estados Unidos",
                     cores=[charts.BR, charts.ROXO],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
         with direita:
             exibir = real[["prazo_anos", "taxa_br", "taxa_us", "diferencial_bps"]].copy()
             exibir.columns = ["Prazo (anos)", "Brasil (%)", "EUA (%)", "Δ (bps)"]
-            st.dataframe(charts.arredondar(exibir), use_container_width=True, hide_index=True, height=420)
+            st.dataframe(charts.arredondar(exibir), width="stretch", hide_index=True, height=420)
 
         st.caption(
             "O diferencial real é o carrego limpo de inflação esperada — é ele, e não o "
@@ -153,7 +153,7 @@ with aba_real:
                 cores=[charts.BR, charts.US],
                 eixo_y="Inflação implícita (% a.a.)",
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -182,7 +182,7 @@ with aba_historico:
                 sufixo="%",
                 cores=[charts.BR, charts.US],
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.plotly_chart(
             charts.grafico_series(
@@ -192,7 +192,7 @@ with aba_historico:
                 sufixo=" p.p.",
                 cores=[charts.VERDE],
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
         atual = serie["diferencial_pp"].iloc[-1]
@@ -221,7 +221,7 @@ with aba_historico:
                     eixo_y="Correlação",
                     cores=[charts.AMBAR],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
             st.caption(
                 "O sinal esperado é **negativo**: diferencial maior atrai capital e derruba "
@@ -258,7 +258,7 @@ with aba_carry:
                     sufixo="%",
                     cores=[charts.BR, charts.US],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
             st.plotly_chart(
                 charts.grafico_series(
@@ -268,7 +268,7 @@ with aba_carry:
                     sufixo=" p.p.",
                     cores=[charts.VERDE],
                 ),
-                use_container_width=True,
+                width="stretch",
             )
             ultimo = carry.iloc[-1]
             st.metric(

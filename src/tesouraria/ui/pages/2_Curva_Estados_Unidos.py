@@ -49,7 +49,7 @@ if curva_real is not None:
 
 st.plotly_chart(
     charts.grafico_curva(curvas, titulo=f"Curva americana em {data_ref}", cores=cores),
-    use_container_width=True,
+    width="stretch",
 )
 
 if curva_real is not None:
@@ -64,7 +64,7 @@ if curva_real is not None:
                 cores=[charts.VERDE],
                 eixo_y="Inflação implícita (% a.a.)",
             ),
-            use_container_width=True,
+            width="stretch",
         )
     with direita:
         st.dataframe(
@@ -78,7 +78,7 @@ if curva_real is not None:
                 }
             )
             .round(3),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=340,
         )
@@ -93,7 +93,7 @@ else:
 st.subheader("Vértices observados")
 tabela = nominal[["tenor", "prazo_anos", "taxa"]].copy()
 tabela.columns = ["Vencimento", "Prazo (anos)", "Taxa (% a.a.)"]
-st.dataframe(charts.arredondar(tabela, 3), use_container_width=True, hide_index=True)
+st.dataframe(charts.arredondar(tabela, 3), width="stretch", hide_index=True)
 
 st.subheader("Histórico do vértice")
 prazo_alvo = st.slider("Prazo (anos)", 0.25, 30.0, 10.0, 0.25)
@@ -109,7 +109,7 @@ else:
             sufixo="%",
             cores=[charts.US],
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 st.caption(
