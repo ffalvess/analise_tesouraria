@@ -1,0 +1,100 @@
+# Feeds de comunicação oficial e de análise pública.
+#
+# Só entram aqui fontes abertas. Pesquisa sell-side (Itaú, BTG, XP, Goldman,
+# Santander e afins) é conteúdo licenciado e não é coletada por este aplicativo
+# — para esses relatórios, use a pasta `data/research_pdfs/`, onde você deposita
+# o que já recebe por direito e o app extrai o texto localmente.
+#
+# Acrescente ou remova feeds à vontade: a ingestão lê esta lista a cada execução.
+
+discursos:
+  - nome: "Fed — Speeches"
+    instituicao: Fed
+    url: "https://www.federalreserve.gov/feeds/speeches.xml"
+    tipo: discurso
+    idioma: en
+
+  - nome: "Fed — Testimony"
+    instituicao: Fed
+    url: "https://www.federalreserve.gov/feeds/testimony.xml"
+    tipo: discurso
+    idioma: en
+
+  - nome: "Fed — Comunicados de política monetária"
+    instituicao: Fed
+    url: "https://www.federalreserve.gov/feeds/press_monetary.xml"
+    tipo: comunicado
+    idioma: en
+
+  - nome: "Fed — Todos os comunicados"
+    instituicao: Fed
+    url: "https://www.federalreserve.gov/feeds/press_all.xml"
+    tipo: comunicado
+    idioma: en
+
+  - nome: "BCB — Discursos e entrevistas"
+    instituicao: BCB
+    url: "https://www.bcb.gov.br/api/feed/sitebcb/discursosentrevistas"
+    formato: json_bcb
+    tipo: discurso
+    idioma: pt
+    verificar: true
+
+  - nome: "BCB — Notas e atas do Copom"
+    instituicao: BCB
+    url: "https://www.bcb.gov.br/api/feed/sitebcb/atascopom"
+    formato: json_bcb
+    tipo: ata
+    idioma: pt
+    verificar: true
+
+  - nome: "BCB — Notícias e comunicados"
+    instituicao: BCB
+    url: "https://www.bcb.gov.br/api/feed/sitebcb/noticias"
+    formato: json_bcb
+    tipo: comunicado
+    idioma: pt
+    verificar: true
+
+research:
+  - nome: "FMI — Brasil"
+    instituicao: FMI
+    url: "https://www.imf.org/en/News/RSS?Language=ENG&category=Country"
+    tipo: relatorio
+    idioma: en
+    filtro_titulo: ["Brazil", "Brasil"]
+
+  - nome: "BIS — Publicações"
+    instituicao: BIS
+    url: "https://www.bis.org/list/bis_publs/rss.xml"
+    tipo: relatorio
+    idioma: en
+
+  - nome: "Banco Mundial — Comunicados"
+    instituicao: "Banco Mundial"
+    url: "https://www.worldbank.org/en/news/all.rss"
+    tipo: relatorio
+    idioma: en
+    filtro_titulo: ["Brazil", "Brasil"]
+
+  - nome: "Fitch Ratings — Comunicados"
+    instituicao: Fitch
+    url: "https://www.fitchratings.com/rss/press-releases"
+    tipo: rating
+    idioma: en
+    filtro_titulo: ["Brazil", "Brasil"]
+    verificar: true
+
+  - nome: "IPEA — Carta de Conjuntura"
+    instituicao: IPEA
+    url: "https://www.ipea.gov.br/cartadeconjuntura/index.php/feed/"
+    tipo: relatorio
+    idioma: pt
+    verificar: true
+
+  - nome: "FGV IBRE — Blog da Conjuntura Econômica"
+    instituicao: "FGV IBRE"
+    url: "https://blogdoibre.fgv.br/rss.xml"
+    tipo: relatorio
+    idioma: pt
+    verificar: true

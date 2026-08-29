@@ -1,0 +1,59 @@
+# Léxico de tom de política monetária em inglês (Fed / FOMC).
+#
+# Mesma mecânica do léxico em português: pesos entre 0 e 2, expressões
+# compostas casadas antes de palavras isoladas, e negação até 3 tokens antes
+# invertendo o lado do termo.
+
+negacoes: ["not", "no", "without", "neither", "nor", "never", "nothing"]
+
+janela_negacao: 3
+
+hawkish:
+  "tighter monetary policy": 2.0
+  "further tightening": 2.0
+  "restrictive stance": 2.0
+  "sufficiently restrictive": 2.0
+  "higher for longer": 2.0
+  "raise the target range": 1.8
+  "rate hike": 1.8
+  "additional firming": 1.8
+  "upside risks to inflation": 1.8
+  "inflation remains elevated": 1.6
+  "unanchored expectations": 1.8
+  "price pressures": 1.4
+  "tight labor market": 1.4
+  "overheating": 1.6
+  "resilient": 0.8
+  "vigilant": 1.2
+  "hawkish": 2.0
+  "restrictive": 1.6
+  "tightening": 1.6
+  "firming": 1.2
+  "elevated": 1.0
+  "persistent": 1.0
+  "stickiness": 1.2
+  "sticky": 1.0
+
+dovish:
+  "easing cycle": 2.0
+  "policy easing": 1.8
+  "rate cut": 1.8
+  "lower the target range": 1.8
+  "accommodative": 1.8
+  "downside risks": 1.4
+  "disinflation": 1.6
+  "disinflationary": 1.6
+  "cooling": 1.4
+  "moderating": 1.2
+  "softening": 1.4
+  "slack": 1.2
+  "labor market cooling": 1.6
+  "well anchored": 1.4
+  "anchored expectations": 1.6
+  "dovish": 2.0
+  "easing": 1.4
+  "weakening": 1.2
+  "slowdown": 1.2
+  "patient": 0.8
+  "cut": 0.8
+  "reduce": 0.8

@@ -1,0 +1,79 @@
+# Léxico de tom de política monetária em português (BCB / Copom).
+#
+# Pesos entre 0 e 2: quanto mais inequívoco o termo, maior o peso. Expressões
+# de mais de uma palavra são casadas antes das palavras isoladas, para que
+# "juro real" não conte como neutro e "cautela" não sobreponha "cautela e
+# serenidade".
+#
+# A pontuação final é (hawk - dove) / (hawk + dove), no intervalo [-1, 1].
+
+negacoes: ["não", "nao", "sem", "nenhum", "nenhuma", "tampouco", "jamais"]
+
+# Palavras que, precedidas de negação até 3 tokens antes, trocam de lado.
+janela_negacao: 3
+
+hawkish:
+  "aperto monetário": 2.0
+  "política monetária contracionista": 2.0
+  "terreno contracionista": 2.0
+  "elevação da taxa": 1.8
+  "alta de juros": 1.8
+  "juros mais altos": 1.6
+  "por período bastante prolongado": 1.6
+  "período prolongado": 1.2
+  "desancoragem": 1.8
+  "desancoradas": 1.6
+  "expectativas desancoradas": 2.0
+  "riscos de alta": 1.4
+  "assimetria altista": 1.6
+  "pressões inflacionárias": 1.4
+  "inflação acima da meta": 1.6
+  "hiato positivo": 1.2
+  "mercado de trabalho aquecido": 1.4
+  "atividade resiliente": 1.0
+  "vigilância": 1.2
+  "vigilante": 1.2
+  "cautela": 0.8
+  "parcimônia": 0.8
+  "serenidade": 0.6
+  "restritivo": 1.6
+  "restritiva": 1.6
+  "contracionista": 1.8
+  "elevar": 1.0
+  "elevação": 1.0
+  "aumentar": 0.8
+  "aperto": 1.4
+  "persistência": 1.0
+  "persistente": 1.0
+  "resiliente": 0.8
+
+dovish:
+  "afrouxamento": 1.8
+  "flexibilização": 1.6
+  "ciclo de cortes": 2.0
+  "corte de juros": 1.8
+  "redução da taxa": 1.6
+  "queda de juros": 1.6
+  "juros mais baixos": 1.6
+  "desinflação": 1.6
+  "processo desinflacionário": 1.8
+  "convergência da inflação": 1.4
+  "expectativas ancoradas": 1.6
+  "ancoragem": 1.4
+  "riscos de baixa": 1.4
+  "assimetria baixista": 1.6
+  "desaceleração": 1.2
+  "arrefecimento": 1.4
+  "arrefecer": 1.2
+  "moderação": 1.0
+  "hiato negativo": 1.2
+  "ociosidade": 1.2
+  "atividade fraca": 1.2
+  "enfraquecimento": 1.2
+  "acomodatícia": 1.8
+  "estimulativa": 1.6
+  "reduzir": 1.0
+  "redução": 1.0
+  "cortar": 1.0
+  "corte": 0.8
+  "alívio": 1.2
