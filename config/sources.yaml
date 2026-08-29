@@ -37,6 +37,11 @@ sources:
     fixture: "anbima_ettj.txt"
     encoding: "latin-1"
     verificar: true
+    # Esta fonte só publica um arquivo por dia, então um backfill longo viraria
+    # milhares de requisições. O limite pega os dias mais recentes da janela
+    # pedida; o histórico se acumula a cada execução diária. A curva BR completa
+    # vem do Tesouro Direto, que entrega todo o histórico num CSV só.
+    max_dias_por_execucao: 30
 
   b3_di:
     descricao: "Ajustes do futuro de DI de um dia (DI1) — curva pré negociada"
@@ -46,6 +51,8 @@ sources:
     fixture: "b3_di.html"
     encoding: "latin-1"
     verificar: true
+    # Mesma limitação da ANBIMA: um boletim por pregão, baixado dia a dia.
+    max_dias_por_execucao: 30
     # Códigos de mês dos contratos futuros da B3.
     meses:
       F: 1

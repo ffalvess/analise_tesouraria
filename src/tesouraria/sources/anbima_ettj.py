@@ -129,10 +129,17 @@ class AnbimaEttjSource(Source):
                 return dt.datetime.strptime(achado, "%d/%m/%Y").date()
         raise ValueError("não foi possível deduzir a data de referência do arquivo")
 
-    @staticmethod
-    def _datas(since: dt.date | None) -> list[dt.date]:
-        """Dias úteis entre `since` e hoje; sem `since`, apenas o último dia útil."""
+    def _datas(self, since: dt.date | None) -> list[dt.date]:
+        """Dias úteis a coletar: os mais recentes da janela pedida.
+
+        A fonte publica um arquivo por pregão, então uma janela de anos viraria
+        milhares de requisições. O teto de `max_dias_por_execucao` mantém cada
+        execução curta e deixa o histórico se acumular dia a dia.
+        """
         hoje = dt.date.today()
         if since is None:
             return [d.date() for d in pd.bdate_range(end=hoje, periods=1)]
-        return [d.date() for d in pd.bdate_range(start=since, end=hoje)]
+
+        datas = [d.date() for d in pd.bdate_range(start=since, end=hoje)]
+        teto = int(self.config.get("max_dias_por_execucao", 30))
+        return datas[-teto:] if teto > 0 else datas

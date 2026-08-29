@@ -133,9 +133,16 @@ class B3DiSource(Source):
             primeiro = primeiro + pd.offsets.BDay(1)
         return primeiro.date()
 
-    @staticmethod
-    def _datas(since: dt.date | None) -> list[dt.date]:
+    def _datas(self, since: dt.date | None) -> list[dt.date]:
+        """Dias úteis a coletar, limitados a `max_dias_por_execucao`.
+
+        Um boletim por pregão: mesma limitação da ANBIMA. O histórico longo da
+        curva brasileira vem do Tesouro Direto, num CSV único.
+        """
         hoje = dt.date.today()
         if since is None:
             return [d.date() for d in pd.bdate_range(end=hoje, periods=1)]
-        return [d.date() for d in pd.bdate_range(start=since, end=hoje)]
+
+        datas = [d.date() for d in pd.bdate_range(start=since, end=hoje)]
+        teto = int(self.config.get("max_dias_por_execucao", 30))
+        return datas[-teto:] if teto > 0 else datas
