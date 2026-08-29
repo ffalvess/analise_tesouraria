@@ -1,0 +1,29 @@
+# Dependências de execução, fixadas nas versões contra as quais a suíte de
+# testes passa. É este arquivo que o Streamlit Community Cloud instala — não
+# conte com a detecção automática do pyproject.toml.
+#
+# Se o build falhar por falta de wheel para a versão de Python escolhida no
+# Community Cloud, confirme que ela é a 3.11 nas configurações avançadas antes
+# de relaxar qualquer pino aqui.
+
+streamlit==1.62.0
+plotly==7.0.0
+pandas==3.0.5
+numpy==2.4.6
+scipy==1.17.1
+statsmodels==0.15.0
+duckdb==1.5.5
+httpx==0.28.1
+tenacity==9.1.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+PyYAML==6.0.1
+feedparser==6.0.14
+pypdf==6.16.2
+beautifulsoup4==4.15.0
+lxml==6.1.2
+python-dateutil==2.9.0.post0
+
+# Instala o próprio pacote `tesouraria` a partir do pyproject.toml.
+# Sem esta linha, `import tesouraria` falha no Community Cloud.
+.

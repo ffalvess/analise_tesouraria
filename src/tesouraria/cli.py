@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from tesouraria import db, sources
+from tesouraria import db, snapshots, sources
 from tesouraria.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,22 @@ def construir_parser() -> argparse.ArgumentParser:
     )
 
     sub.add_parser("status", help="mostra o frescor dos dados por fonte")
+
+    snapshot = sub.add_parser(
+        "snapshot",
+        help="exporta o banco para Parquet versionado, ou o reconstrói a partir dele",
+    )
+    snapshot.add_argument(
+        "acao",
+        choices=["export", "import"],
+        help="export: banco -> data/snapshots/. import: data/snapshots/ -> banco.",
+    )
+    snapshot.add_argument(
+        "--dir",
+        dest="diretorio",
+        type=Path,
+        help="diretório dos snapshots (padrão: data/snapshots)",
+    )
 
     serve = sub.add_parser("serve", help="abre a interface Streamlit")
     serve.add_argument("--port", type=int, default=8501)
@@ -112,6 +128,31 @@ def comando_status(_: argparse.Namespace) -> int:
     return 0
 
 
+def comando_snapshot(args: argparse.Namespace) -> int:
+    destino = args.diretorio or snapshots.diretorio_padrao()
+
+    with db.connection() as con:
+        if args.acao == "export":
+            resumo = snapshots.exportar(con, destino)
+            verbo = "exportadas"
+        else:
+            resumo = snapshots.importar(con, destino)
+            verbo = "importadas"
+
+    if not resumo:
+        print(f"Nada a fazer: nenhum snapshot em {destino}")
+        return 0
+
+    for tabela, linhas in resumo.items():
+        print(f"  {tabela:14s} {linhas:>9,} linhas".replace(",", "."))
+
+    total = sum(resumo.values())
+    print(f"\n{total:,} linhas {verbo} · {destino}".replace(",", "."))
+    if args.acao == "export":
+        print(f"Tamanho em disco: {snapshots.tamanho(destino) / 1e6:.1f} MB")
+    return 0
+
+
 def comando_serve(args: argparse.Namespace) -> int:
     if args.offline:
         os.environ["TESOURARIA_OFFLINE"] = "1"
@@ -134,6 +175,7 @@ def main(argv: list[str] | None = None) -> int:
     comandos = {
         "ingest": comando_ingest,
         "status": comando_status,
+        "snapshot": comando_snapshot,
         "serve": comando_serve,
     }
     return comandos[args.comando](args)
