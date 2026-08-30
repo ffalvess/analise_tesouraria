@@ -16,8 +16,39 @@ import yaml
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# src/tesouraria/settings.py -> raiz do repositório
-ROOT_DIR = Path(__file__).resolve().parents[2]
+# Arquivo que identifica a raiz do projeto de forma inequívoca.
+MARCADOR_RAIZ = Path("config") / "sources.yaml"
+
+
+def descobrir_raiz() -> Path:
+    """Localiza a raiz do projeto, onde vivem `config/` e `data/`.
+
+    Não basta subir dois níveis a partir deste arquivo. Isso só vale na
+    instalação editável (`pip install -e .`), em que o pacote fica em
+    `<repo>/src/tesouraria`. Na instalação normal — que é o que a integração
+    contínua e o Streamlit Community Cloud fazem, via `requirements.txt` — o
+    pacote é copiado para `site-packages`, e subir dois níveis leva a
+    `.../lib/python3.11/`, onde não existe nem `config/` nem `data/`.
+
+    A busca começa pelo diretório de trabalho e sobe por seus ancestrais — é
+    onde o repositório está tanto no runner da CI quanto no servidor do
+    Streamlit, e dar precedência a ele torna previsível qual projeto será usado
+    quando houver mais de um clone. O caminho relativo ao pacote entra por
+    último, para o caso de a CLI ser chamada de fora de qualquer projeto.
+    """
+    cwd = Path.cwd().resolve()
+    candidatos = [cwd, *cwd.parents, Path(__file__).resolve().parents[2]]
+
+    for candidato in candidatos:
+        if (candidato / MARCADOR_RAIZ).is_file():
+            return candidato
+
+    # Sem marcador em lugar nenhum, o diretório de trabalho é o melhor palpite;
+    # `load_config` dirá exatamente qual arquivo faltou.
+    return cwd
+
+
+ROOT_DIR = descobrir_raiz()
 
 
 class Settings(BaseSettings):
