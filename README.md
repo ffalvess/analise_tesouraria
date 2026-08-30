@@ -110,9 +110,14 @@ um diferencial nulo.
 | `speeches` | Fed (RSS) e BCB (feed JSON) | não |
 | `research` | Feeds públicos + `data/research_pdfs/` | não |
 
-Sem `TESOURARIA_FRED_API_KEY`, a fonte `us_macro` é registrada como `pulado` e
-o resto segue normalmente. A chave é gratuita:
+Sem `FRED_API_KEY`, a fonte `us_macro` é registrada como `pulado` e o resto
+segue normalmente. A chave é gratuita:
 <https://fred.stlouisfed.org/docs/api/api_key.html>
+
+`FRED_API_KEY` é o mesmo nome nos três lugares — `.env` local, secrets do
+GitHub Actions e secrets do Streamlit. É a única configuração sem o prefixo
+`TESOURARIA_`, de propósito: cadastrar com o nome errado não daria erro, apenas
+faria a fonte sair como `pulado` sem ninguém notar.
 
 ### Relatórios de casas de análise
 
@@ -179,11 +184,12 @@ Em <https://share.streamlit.io> → **New app**:
 Em **Advanced settings → Secrets**, cole:
 
 ```toml
-TESOURARIA_FRED_API_KEY = "sua-chave-do-fred"
+FRED_API_KEY = "sua-chave-do-fred"
 ```
 
-O aplicativo copia os secrets para variáveis de ambiente no boot, então não
-importa se a plataforma os expõe dessa forma ou não.
+Mesmo nome do secret no GitHub Actions. O aplicativo copia os secrets para
+variáveis de ambiente no boot, então não importa se a plataforma os expõe dessa
+forma ou não.
 
 ### Duas ressalvas
 

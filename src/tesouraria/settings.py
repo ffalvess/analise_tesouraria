@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # src/tesouraria/settings.py -> raiz do repositório
@@ -27,6 +28,10 @@ class Settings(BaseSettings):
         env_file=ROOT_DIR / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # `fred_api_key` tem um alias explícito, que sobrepõe o prefixo. Sem
+        # isto, o pydantic deixaria de aceitar o nome do campo na construção
+        # direta — `Settings(fred_api_key=...)` quebraria.
+        populate_by_name=True,
     )
 
     # Modo offline: as fontes leem `data/fixtures/` em vez da rede. Permite
@@ -39,7 +44,17 @@ class Settings(BaseSettings):
 
     # Chave opcional: sem ela, as séries do FRED são simplesmente puladas e
     # registradas como tal em `ingest_log`.
-    fred_api_key: str | None = None
+    #
+    # É a única configuração que precisa ser cadastrada em três lugares — no
+    # `.env` local, nos secrets do GitHub Actions e nos do Streamlit —, e por
+    # isso usa o mesmo nome `FRED_API_KEY` nos três, sem o prefixo do projeto.
+    # Cadastrar com o nome errado não daria erro: a fonte apenas sairia como
+    # `pulado` sem ninguém notar. `TESOURARIA_FRED_API_KEY` segue aceito, para
+    # não quebrar um `.env` que já exista.
+    fred_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FRED_API_KEY", "TESOURARIA_FRED_API_KEY"),
+    )
 
     http_timeout: float = 30.0
     http_retries: int = 3

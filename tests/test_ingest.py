@@ -80,6 +80,35 @@ def test_documentos_recebem_score_de_tom(ambiente_ingerido):
     assert documentos["score_tom"].min() < 0
 
 
+@pytest.mark.parametrize(
+    "variavel", ["FRED_API_KEY", "TESOURARIA_FRED_API_KEY"]
+)
+def test_chave_do_fred_aceita_os_dois_nomes(variavel, monkeypatch, tmp_path):
+    """`FRED_API_KEY` é o nome documentado; o antigo segue valendo.
+
+    Cadastrar a chave com o nome errado não daria erro — a fonte apenas sairia
+    como `pulado` sem ninguém notar. Aceitar os dois nomes remove a armadilha,
+    e este teste impede que a compatibilidade se perca numa refatoração.
+    """
+    from tesouraria.settings import Settings
+
+    for nome in ("FRED_API_KEY", "TESOURARIA_FRED_API_KEY"):
+        monkeypatch.delenv(nome, raising=False)
+    monkeypatch.setenv(variavel, "chave-de-teste")
+
+    # Um .env do repositório sobreporia o ambiente do teste.
+    assert Settings(_env_file=tmp_path / "vazio.env").fred_api_key == "chave-de-teste"
+
+
+def test_chave_do_fred_ausente(monkeypatch, tmp_path):
+    from tesouraria.settings import Settings
+
+    for nome in ("FRED_API_KEY", "TESOURARIA_FRED_API_KEY"):
+        monkeypatch.delenv(nome, raising=False)
+
+    assert Settings(_env_file=tmp_path / "vazio.env").fred_api_key is None
+
+
 def test_fonte_sem_chave_de_api_e_pulada(ambiente_ingerido, monkeypatch):
     """Sem FRED_API_KEY e fora do modo offline, a fonte é `pulado`, não `erro`."""
     from tesouraria.settings import Settings
