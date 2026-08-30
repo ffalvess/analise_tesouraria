@@ -16,6 +16,7 @@ import streamlit as st
 from tesouraria.analytics import curve as curva_mod
 from tesouraria.analytics import differentials as dif
 from tesouraria.ui import charts, common
+from tesouraria.ui import premio as premio_ui
 
 common.configurar("Painel", "🧭")
 
@@ -74,11 +75,24 @@ colunas[0].metric(
 colunas[1].metric("Diferencial 2 anos", charts.formatar_bps(_no_vertice(2.0, "diferencial_bps")))
 colunas[2].metric("Diferencial 5 anos", charts.formatar_bps(_no_vertice(5.0, "diferencial_bps")))
 colunas[3].metric("Diferencial 10 anos", charts.formatar_bps(_no_vertice(10.0, "diferencial_bps")))
-colunas[4].metric(
-    "Fluxo cambial (semana)",
-    f"US$ {ultimo_fluxo:,.0f} mi".replace(",", ".") if np.isfinite(ultimo_fluxo) else "—",
-    help="Saldo entre compras e vendas de moeda estrangeira. Positivo = entrada líquida.",
-)
+if np.isfinite(ultimo_fluxo):
+    colunas[4].metric(
+        "Fluxo cambial (semana)",
+        f"US$ {ultimo_fluxo:,.0f} mi".replace(",", "."),
+        help="Saldo entre compras e vendas de moeda estrangeira. Positivo = entrada líquida.",
+    )
+else:
+    # A fonte de fluxo está desativada até os códigos do SGS serem confirmados.
+    # Em vez de um traço inútil, o espaço mostra o prêmio do real do dia — que
+    # responde a mesma pergunta de fundo: o movimento é do dólar ou do Brasil?
+    colunas[4].metric(
+        "Prêmio do real (dia)",
+        charts.formatar_pct(premio_ui.premio_do_dia(cambio)),
+        help=(
+            "Δ% do dólar menos Δ% da cesta de economias avançadas. Positivo = o real "
+            "perdeu além do que o dólar global explica. Detalhes no bloco abaixo."
+        ),
+    )
 
 st.caption(
     f"Curvas de {data_br} (Brasil, {fonte_br}) e {data_us} (EUA). "
@@ -109,6 +123,10 @@ with direita:
         ),
         width="stretch",
     )
+
+
+# ------------------------------------------------------------ dólar × cesta
+premio_ui.bloco_compacto(cambio, "painel")
 
 
 # ------------------------------------------------------- diferencial e tom

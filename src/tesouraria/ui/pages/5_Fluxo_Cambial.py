@@ -12,6 +12,7 @@ import streamlit as st
 
 from tesouraria.analytics import fxflow
 from tesouraria.ui import charts, common
+from tesouraria.ui import premio as premio_ui
 
 common.configurar("Fluxo cambial × dólar", "💵")
 
@@ -21,16 +22,28 @@ if not common.exigir_dados():
 fluxo = common.cache_fluxo()
 cambio = common.cache_serie("1")
 
-if fluxo.empty:
-    st.warning(
-        "Nenhum dado de fluxo cambial no banco. Rode `tesouraria ingest --source fx_flow`. "
-        "Se a fonte falhar, confira os códigos de série em `config/sources.yaml` — eles "
-        "estão marcados para verificação."
-    )
+if cambio.empty:
+    st.warning("Sem a série de câmbio (PTAX, série 1 do SGS) para esta página.")
     st.stop()
 
-if cambio.empty:
-    st.warning("Sem a série de câmbio (PTAX, série 1 do SGS) para cruzar com o fluxo.")
+# O prêmio do real não depende do fluxo cambial, então é renderizado antes e
+# independentemente — a fonte de fluxo está desativada até os códigos do SGS
+# serem confirmados, e não faria sentido perder também esta análise.
+premio_ui.secao_premio(cambio)
+
+if fluxo.empty:
+    st.divider()
+    st.warning(
+        "**Fluxo cambial indisponível.** Os códigos do SGS usados originalmente "
+        "(22707–22715) não eram fluxo cambial: `comercial` e `financeiro` vinham com "
+        "correlação 1,000000 — a mesma série — e `total` era mil vezes menor e negativo "
+        "em todas as observações. Era isso que aparecia aqui como saldo sempre negativo.\n\n"
+        "A fonte foi desativada em `config/sources.yaml` até que os códigos corretos "
+        "sejam identificados, porque exibir aqueles números seria pior que não exibir "
+        "nada. Veja a nota no arquivo para reativá-la.",
+        icon="⚠️",
+    )
+    common.rodape()
     st.stop()
 
 segmento = st.sidebar.selectbox(
