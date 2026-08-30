@@ -33,8 +33,10 @@ class B3DiSource(Source):
     def collect(self, since: dt.date | None = None) -> pd.DataFrame:
         cfg = self.config
         quadros: list[pd.DataFrame] = []
+        datas = self._datas(since)
+        ultimo_erro: str | None = None
 
-        for data_ref in self._datas(since):
+        for data_ref in datas:
             try:
                 raw = self.get(
                     cfg["url"],
@@ -43,16 +45,26 @@ class B3DiSource(Source):
                 )
                 quadros.append(self.parse(raw, data_ref=data_ref))
             except Exception as exc:  # noqa: BLE001 — feriado e dia sem pregão são esperados
-                logger.info("B3 DI1 sem dados para %s: %s", data_ref, exc)
+                ultimo_erro = f"{type(exc).__name__}: {exc}"
+                logger.warning("B3 DI1 sem dados para %s: %s", data_ref, exc)
 
         quadros = [q for q in quadros if not q.empty]
         if not quadros:
-            return pd.DataFrame()
+            # Nenhum pregão rendeu dado. Levantar, em vez de devolver vazio, é o
+            # que distingue "a fonte está quebrada" de "não houve pregão" — as
+            # duas apareciam como `vazio` no rodapé, e foi assim que a falta do
+            # html5lib passou despercebida na primeira coleta real.
+            raise RuntimeError(
+                f"nenhuma das {len(datas)} datas consultadas devolveu dados; "
+                f"último erro: {ultimo_erro}"
+            )
         return pd.concat(quadros, ignore_index=True)
 
     def parse(self, raw: bytes, data_ref: dt.date) -> pd.DataFrame:
         texto = raw.decode(self.config.get("encoding", "latin-1"), errors="replace")
-        tabelas = pd.read_html(io.StringIO(texto), decimal=",", thousands=".")
+        # flavor explicito: o padrao do pandas cai em bs4+html5lib, que pode nao
+        # existir num ambiente limpo. lxml ja e dependencia declarada.
+        tabelas = pd.read_html(io.StringIO(texto), decimal=",", thousands=".", flavor="lxml")
 
         df = self._tabela_de_ajustes(tabelas)
         if df is None:

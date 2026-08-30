@@ -88,6 +88,58 @@ def test_table_columns_le_o_ddl():
     assert colunas == ("data_ref", "tipo", "tenor", "prazo_anos", "taxa")
 
 
+def serie(serie_id: str, n: int = 3) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "pais": "BR",
+            "fonte": "bcb_sgs",
+            "serie_id": serie_id,
+            "nome": f"série {serie_id}",
+            "unidade": "un",
+            "data_ref": [dt.date(2026, 1, k + 1) for k in range(n)],
+            "valor": [1.0 * k for k in range(n)],
+        }
+    )
+
+
+def test_poda_remove_o_que_nao_esta_declarado(con):
+    """O invariante: o banco contém apenas o que a configuração declara.
+
+    Sem isto, uma série retirada da configuração voltaria a cada execução do
+    workflow — que importa o snapshot antes de coletar. Foi o caso das séries
+    que se revelaram trocadas: parariam de ser coletadas e continuariam sendo
+    exibidas.
+    """
+    db.upsert(con, "series_macro", serie("432"))
+    db.upsert(con, "series_macro", serie("2255"))  # a que se revelou trocada
+
+    removidas = db.podar(con, {"432", "12"})
+
+    assert removidas == {"series_macro": 3}
+    restantes = {linha[0] for linha in con.execute(
+        "SELECT DISTINCT serie_id FROM series_macro"
+    ).fetchall()}
+    assert restantes == {"432"}
+
+
+def test_poda_sem_nada_a_remover(con):
+    db.upsert(con, "series_macro", serie("432"))
+    assert db.podar(con, {"432"}) == {}
+
+
+def test_poda_com_conjunto_vazio_nao_apaga_tudo(con):
+    """Salvaguarda: um bug que zerasse a lista não pode zerar o banco."""
+    db.upsert(con, "series_macro", serie("432"))
+    assert db.podar(con, set()) == {}
+    assert con.execute("SELECT COUNT(*) FROM series_macro").fetchone()[0] == 3
+
+
+def test_limpar_tabela(con):
+    db.upsert(con, "curve_br", lote())
+    assert db.limpar_tabela(con, "curve_br") == 2
+    assert db.limpar_tabela(con, "curve_br") == 0
+
+
 def test_log_e_status(con, banco_temporario):
     db.log_ingest(con, "tesouro_direto", "ok", 100, "fixture")
     db.log_ingest(con, "focus", "erro", 0, "rede", "timeout")

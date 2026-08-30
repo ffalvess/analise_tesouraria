@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 from tesouraria import db, snapshots, sources
-from tesouraria.settings import get_settings
+from tesouraria.settings import get_settings, source_config
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,16 @@ def construir_parser() -> argparse.ArgumentParser:
         help="diretório dos snapshots (padrão: data/snapshots)",
     )
 
+    sonda = sub.add_parser(
+        "sgs-probe",
+        help="descobre o que há numa faixa de códigos do SGS, para identificar séries",
+    )
+    sonda.add_argument("--de", type=int, required=True, help="primeiro código da faixa")
+    sonda.add_argument("--ate", type=int, required=True, help="último código da faixa")
+    sonda.add_argument(
+        "--amostra", type=int, default=24, help="observações a buscar por série (padrão: 24)"
+    )
+
     serve = sub.add_parser("serve", help="abre a interface Streamlit")
     serve.add_argument("--port", type=int, default=8501)
     serve.add_argument("--offline", action="store_true", help="roda a interface em modo offline")
@@ -103,6 +113,18 @@ def comando_ingest(args: argparse.Namespace) -> int:
                 resultado.erro or ""
             )
             print(f"{resultado.status} {detalhe}".strip())
+
+        # Poda apenas na coleta completa: rodando uma fonte só, o resto do banco
+        # não está em jogo e apagá-lo seria destrutivo sem motivo.
+        if len(nomes) == len(sources.REGISTRO):
+            removidas = db.podar(con, sources.series_declaradas())
+            for tabela, quantas in removidas.items():
+                print(f"  podadas {quantas} linhas de {tabela} (séries não declaradas)")
+
+            if not source_config("fx_flow").get("series"):
+                limpas = db.limpar_tabela(con, "fx_flow")
+                if limpas:
+                    print(f"  limpas {limpas} linhas de fx_flow (fonte desativada)")
 
     falhas = [r for r in resultados if r.status == "erro"]
     print(
@@ -153,6 +175,69 @@ def comando_snapshot(args: argparse.Namespace) -> int:
     return 0
 
 
+def comando_sgs_probe(args: argparse.Namespace) -> int:
+    """Varre uma faixa de códigos do SGS e descreve o que cada um devolve.
+
+    Existe porque o SGS não tem API de metadados: um código errado não dá erro,
+    devolve outra série. Foi assim que os códigos de fluxo cambial entraram
+    errados e passaram meses de dados sem ninguém notar. Em vez de adivinhar de
+    novo, esta sonda mostra periodicidade, ordem de grandeza e troca de sinal —
+    o suficiente para reconhecer a série procurada.
+
+    Uso típico: `tesouraria sgs-probe --de 22600 --ate 22800`, e procure no
+    resultado as séries semanais, em milhares de US$ milhões, com sinal que
+    alterna — o formato do fluxo cambial contratado.
+    """
+    import json
+
+    from tesouraria.http import fetch
+    from tesouraria.sources.bcb_sgs import parse_sgs
+
+    modelo = source_config("bcb_sgs")["url_template"]
+    print(f"{'código':>8} {'n':>4} {'período':>22} {'perio.':>8} "
+          f"{'mín':>14} {'média':>14} {'máx':>14}  sinal")
+    print("-" * 105)
+
+    encontrados = 0
+    for codigo in range(args.de, args.ate + 1):
+        try:
+            bruto = fetch(
+                modelo.format(codigo=codigo) + f"/ultimos/{args.amostra}",
+                params={"formato": "json"},
+                use_cache=False,
+            )
+            dados = parse_sgs(json.loads(bruto.decode("utf-8")), str(codigo))
+        except Exception as exc:  # noqa: BLE001 — faixa varrida; a maioria não existe
+            logger.debug("SGS %s indisponível: %s", codigo, exc)
+            continue
+
+        if dados.empty or dados["valor"].isna().all():
+            continue
+
+        datas = pd.to_datetime(dados["data_ref"])
+        intervalo = datas.diff().dt.days.median()
+        periodicidade = (
+            "diária" if intervalo <= 3 else
+            "semanal" if intervalo <= 10 else
+            "mensal" if intervalo <= 45 else
+            "trimestral" if intervalo <= 120 else "anual"
+        )
+        valores = dados["valor"].dropna()
+        sinal = "alterna" if (valores > 0).any() and (valores < 0).any() else (
+            "positivo" if (valores >= 0).all() else "negativo"
+        )
+
+        print(
+            f"{codigo:>8} {len(dados):>4} "
+            f"{datas.min():%Y-%m-%d}..{datas.max():%Y-%m-%d} {periodicidade:>8} "
+            f"{valores.min():>14,.2f} {valores.mean():>14,.2f} {valores.max():>14,.2f}  {sinal}"
+        )
+        encontrados += 1
+
+    print(f"\n{encontrados} séries com dados na faixa {args.de}–{args.ate}.")
+    return 0
+
+
 def comando_serve(args: argparse.Namespace) -> int:
     if args.offline:
         os.environ["TESOURARIA_OFFLINE"] = "1"
@@ -176,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
         "ingest": comando_ingest,
         "status": comando_status,
         "snapshot": comando_snapshot,
+        "sgs-probe": comando_sgs_probe,
         "serve": comando_serve,
     }
     return comandos[args.comando](args)

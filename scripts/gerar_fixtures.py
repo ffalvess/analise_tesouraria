@@ -399,7 +399,14 @@ fred_payload = {
     "CPILFESL": fred(meses, 315 + np.cumsum(np.abs(rng.normal(0.6, 0.25, len(meses))))),
     "UNRATE": fred(meses, np.clip(4.1 + np.cumsum(rng.normal(0.01, 0.08, len(meses))), 3, 8)),
     "PAYEMS": fred(meses, 158_000 + np.cumsum(rng.normal(150, 60, len(meses)))),
-    "DTWEXBGS": fred(dias, 121 + np.cumsum(rng.normal(0, 0.12, n))),
+    # As tres cestas do dolar. Passeio com reversao a media, para os valores
+    # ficarem dentro da faixa plausivel declarada em config/sources.yaml -- que
+    # e justamente o que a validacao de ingestao confere.
+    "DTWEXBGS": fred(dias, passeio(121, 0.12, 0.004)),
+    "DTWEXAFEGS": fred(dias, passeio(112, 0.14, 0.004)),
+    # Emergentes construida para andar junto com o dolar/real: e o descolamento
+    # entre as duas que a pagina do premio mede.
+    "DTWEXEMEGS": fred(dias, passeio(158, 0.10, 0.004)),
     "T10Y2Y": fred(dias, inclin_us * 0.8),
 }
 (DESTINO / "us_macro.json").write_text(json.dumps(fred_payload), encoding="utf-8")

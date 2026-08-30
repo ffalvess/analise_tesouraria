@@ -32,6 +32,22 @@ class FxFlowSource(Source):
     name = "fx_flow"
     table = "fx_flow"
 
+    def skip_reason(self) -> str | None:
+        """Sem códigos confirmados, não coletar é melhor que coletar errado.
+
+        Os códigos originais (22707–22715) eram um palpite, e a primeira coleta
+        real provou que traziam outra coisa: `comercial` e `financeiro` vinham
+        com correlação 1,000000 — a mesma série — e `total` era mil vezes menor
+        e negativo em todas as 139 observações. A página exibia isso como
+        "fluxo cambial", que é pior do que não exibir nada.
+        """
+        if not self.config.get("series"):
+            return (
+                "códigos do SGS não confirmados; veja a nota em config/sources.yaml "
+                "e use o workflow 'Sondar séries do SGS' para identificá-los"
+            )
+        return None
+
     def collect(self, since: dt.date | None = None) -> pd.DataFrame:
         cfg = self.config
         inicio = since or INICIO_PADRAO

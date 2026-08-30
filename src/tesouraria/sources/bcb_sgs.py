@@ -17,6 +17,7 @@ import logging
 import pandas as pd
 
 from tesouraria.sources.base import Source
+from tesouraria.sources.validation import aceitar_serie
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class BcbSgsSource(Source):
                 logger.warning("SGS %s (%s) falhou: %s", codigo, serie.get("nome"), exc)
                 continue
 
-            if parcial.empty:
+            if parcial.empty or not aceitar_serie(parcial, serie, f"SGS {codigo}"):
                 continue
 
             parcial["pais"] = serie.get("pais", "BR")

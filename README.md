@@ -72,7 +72,7 @@ testar e demonstrar. Regere-os com `python scripts/gerar_fixtures.py`.
 | **Curva Estados Unidos** | Curva nominal e real (TIPS), e a inflação implícita entre elas |
 | **Comparação de datas** | A mesma curva em N datas sobrepostas, com a variação em bps por vértice e a leitura do movimento |
 | **Diferencial BR × EUA** | O prêmio por vértice, o diferencial real, a série histórica e a correlação com o dólar |
-| **Fluxo cambial** | Fluxo semanal contra a cotação, regressão, beta móvel e acumulados |
+| **Fluxo cambial** | Prêmio do real contra as cestas de moedas; fluxo semanal contra a cotação, regressão e beta móvel |
 | **Balança comercial** | Exportação, importação, saldo, e o descasamento entre saldo registrado e dólares internalizados |
 | **Focus** | A trajetória das revisões, a dispersão entre analistas, Focus contra Top 5 e contra a curva |
 | **Inflação, emprego e atividade** | Os dois países lado a lado, no mesmo recorte |
@@ -102,11 +102,11 @@ um diferencial nulo.
 | `b3_di` | B3 — ajustes do futuro de DI (DI1) | não |
 | `us_treasury` | US Treasury — par yield nominal e real | não |
 | `bcb_sgs` | Banco Central — Selic, CDI, PTAX, IPCA, IBC-Br, balança | não |
-| `fx_flow` | Banco Central — movimento de câmbio contratado | não |
+| `fx_flow` | Banco Central — movimento de câmbio contratado ⚠️ **desativada**, ver abaixo | não |
 | `focus` | Banco Central (Olinda) — Focus e Top 5 | não |
 | `comex` | Comex Stat / MDIC — balança detalhada | não |
-| `ibge_sidra` | IBGE — IPCA, PNAD, PIB, PMC | não |
-| `us_macro` | FRED — CPI, desemprego, payroll, Fed Funds, DXY | **sim** |
+| `ibge_sidra` | IBGE — IPCA e desocupação (PNAD) | não |
+| `us_macro` | FRED — CPI, desemprego, payroll, Fed Funds e as cestas do dólar | **sim** |
 | `speeches` | Fed (RSS) e BCB (feed JSON) | não |
 | `research` | Feeds públicos + `data/research_pdfs/` | não |
 
@@ -123,8 +123,10 @@ faria a fonte sair como `pulado` sem ninguém notar.
 
 Pesquisa sell-side (Itaú, BTG, XP, Goldman, Santander e afins) é conteúdo
 licenciado e **não é coletada** por este aplicativo. Os feeds em
-`config/feeds.yaml` cobrem apenas fontes abertas — FMI, BIS, Banco Mundial,
-agências de rating, IPEA, FGV.
+`config/feeds.yaml` cobrem apenas fontes abertas — agências de rating e FGV
+IBRE, além dos discursos oficiais do Fed e do BCB. Os feeds do FMI, do BIS, do
+Banco Mundial e do IPEA foram removidos por não responderem; as URLs antigas
+ficaram anotadas no arquivo.
 
 Para incluir os relatórios que você já recebe por direito, coloque os PDFs em
 `data/research_pdfs/` e rode `tesouraria ingest --source research`. O texto é
@@ -216,6 +218,38 @@ sintéticos* aparece em todas as telas, nomeando as fontes afetadas.
 
 ---
 
+## Como o projeto se defende de dados errados
+
+A primeira coleta real ensinou que **o erro perigoso não é o que falha, é o que
+passa**. Um código errado do SGS raramente dá erro: devolve outra série, bem
+formada e sem sentido. Três séries entraram assim — "exportações" com valores
+negativos, "reservas internacionais" sete vezes maiores que as reservas do país,
+e um suposto fluxo cambial cujos segmentos "comercial" e "financeiro" tinham
+correlação 1,000000, por serem a mesma série.
+
+Três camadas passaram a existir por causa disso:
+
+1. **Faixa plausível por série** (`faixa: [min, max]` em `config/sources.yaml`).
+   Não é validação estatística, é âncora de ordem de grandeza — "o dólar fica
+   entre 0,50 e 20 reais". Série fora da faixa é rejeitada na ingestão, com o
+   observado no log. Um teste garante que toda série declarada tenha faixa.
+2. **Erro que se explica** — as exceções de HTTP carregam o corpo da resposta.
+   É onde as APIs dizem qual cláusula do filtro está errada.
+3. **Sonda do SGS** — `tesouraria sgs-probe --de 22600 --ate 22800`, também
+   disponível como workflow. Varre uma faixa de códigos e descreve o que cada um
+   devolve: periodicidade, ordem de grandeza, se o sinal alterna. Serve para
+   identificar a série certa em vez de adivinhar de novo.
+
+### O que está desativado
+
+`fx_flow` está sem códigos até que os corretos sejam identificados pela sonda.
+A página de fluxo cambial explica a ausência e continua entregando o prêmio do
+real, que não depende dessa fonte. Preferir a lacuna ao número errado é
+deliberado: numa mesa, um saldo com o sinal trocado custa mais que um espaço
+vazio.
+
+---
+
 ## ⚠️ Checklist de validação dos endpoints
 
 **Leia isto antes da primeira execução com rede aberta.**
@@ -257,7 +291,7 @@ Uma fonte que falha não derruba as outras nem o aplicativo: o erro fica em
 
 ```bash
 ruff check src tests scripts     # lint
-pytest -q                        # 144 testes, todos offline
+pytest -q                        # 183 testes, todos offline
 pytest --cov=tesouraria          # com cobertura
 ```
 

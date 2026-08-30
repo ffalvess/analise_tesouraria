@@ -18,6 +18,7 @@ import pandas as pd
 
 from tesouraria.settings import get_settings
 from tesouraria.sources.base import Source
+from tesouraria.sources.validation import aceitar_serie
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class UsMacroSource(Source):
                 logger.warning("FRED %s falhou: %s", serie_id, exc)
                 continue
 
-            if parcial.empty:
+            if parcial.empty or not aceitar_serie(parcial, serie, f"FRED {serie_id}"):
                 continue
             parcial["pais"] = "US"
             parcial["fonte"] = "fred"

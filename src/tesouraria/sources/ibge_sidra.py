@@ -19,6 +19,7 @@ import logging
 import pandas as pd
 
 from tesouraria.sources.base import Source
+from tesouraria.sources.validation import aceitar_serie
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class IbgeSidraSource(Source):
                 logger.warning("SIDRA %s falhou: %s", serie_id, exc)
                 continue
 
-            if parcial.empty:
+            if parcial.empty or not aceitar_serie(parcial, serie, f"SIDRA {serie_id}"):
                 continue
             parcial["pais"] = "BR"
             parcial["fonte"] = "ibge_sidra"

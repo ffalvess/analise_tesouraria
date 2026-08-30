@@ -47,4 +47,27 @@ def todas() -> list[Source]:
     return [classe() for classe in REGISTRO.values()]
 
 
+def series_declaradas() -> set[str]:
+    """Todos os `serie_id` que a configuração declara para `series_macro`.
+
+    Usada pela poda: o que não estiver aqui não deveria estar no banco. Cada
+    fonte forma o identificador de um jeito, e é este o lugar onde essa
+    convenção fica registrada.
+    """
+    from tesouraria.settings import load_config
+
+    fontes = load_config("sources")["sources"]
+    declaradas: set[str] = set()
+
+    declaradas |= {str(s["codigo"]) for s in fontes["bcb_sgs"].get("series", [])}
+    declaradas |= {str(s["serie_id"]) for s in fontes["us_macro"].get("series", [])}
+    declaradas |= {
+        f"{s['tabela']}-{s['variavel']}" for s in fontes["ibge_sidra"].get("series", [])
+    }
+    # O Comex Stat monta os identificadores no próprio módulo, a partir do fluxo.
+    declaradas |= {"comex_export", "comex_import", "comex_saldo"}
+
+    return declaradas
+
+
 __all__ = ["REGISTRO", "IngestResult", "Source", "criar", "todas"]

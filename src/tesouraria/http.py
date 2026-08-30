@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -49,10 +50,50 @@ def _read_cache(path: Path, ttl_hours: float) -> bytes | None:
     return path.read_bytes()
 
 
+class RespostaDeErro(RuntimeError):
+    """Erro HTTP que carrega o que o servidor respondeu.
+
+    `raise_for_status()` do httpx descarta o corpo, e é justamente ali que as
+    APIs explicam o problema: o Olinda diz qual cláusula do filtro OData está
+    malformada, o Comex Stat diz quanto esperar antes de tentar de novo. Sem
+    esse texto, corrigir um endpoint vira adivinhação.
+    """
+
+
+class ErroTemporario(RespostaDeErro):
+    """Erro que vale a pena repetir: 429 e 5xx."""
+
+
+def _classificar(exc: httpx.HTTPStatusError) -> RespostaDeErro:
+    resposta = exc.response
+    corpo = resposta.text.strip().replace("\n", " ")[:500]
+    mensagem = f"HTTP {resposta.status_code} em {resposta.request.url}"
+    if corpo:
+        mensagem += f" — resposta: {corpo}"
+
+    # 429 e 5xx podem passar; 4xx no geral, não: um 400 malformado ou um 404
+    # inexistente continuarão iguais na terceira tentativa.
+    if resposta.status_code == 429 or resposta.status_code >= 500:
+        return ErroTemporario(mensagem)
+    return RespostaDeErro(mensagem)
+
+
+def _espera(tentativa) -> float:
+    """Backoff exponencial, mas respeitando `Retry-After` quando o servidor manda."""
+    exc = tentativa.outcome.exception() if tentativa.outcome else None
+    if isinstance(exc, ErroTemporario):
+        achado = re.search(r"[Rr]etry-[Aa]fter[\"']?\s*[:=]\s*[\"']?(\d+)", str(exc))
+        if achado:
+            return min(float(achado.group(1)), 120.0)
+    return wait_exponential(multiplier=2, min=5, max=120)(tentativa)
+
+
 @retry(
-    retry=retry_if_exception_type((httpx.TransportError, httpx.HTTPStatusError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=16),
+    # Só erro de transporte e erro temporário. Repetir um 400 três vezes só
+    # gastava o tempo do workflow — foram minutos na primeira coleta real.
+    retry=retry_if_exception_type((httpx.TransportError, ErroTemporario)),
+    stop=stop_after_attempt(4),
+    wait=_espera,
     reraise=True,
 )
 def _request(
@@ -66,7 +107,10 @@ def _request(
 ) -> bytes:
     with httpx.Client(timeout=timeout, follow_redirects=True) as client:
         response = client.request(method, url, params=params, data=data, headers=headers)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise _classificar(exc) from exc
         return response.content
 
 

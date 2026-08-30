@@ -102,40 +102,65 @@ sources:
     fixture: "bcb_sgs.json"
     # A API do SGS limita janelas longas; a ingestão fatia por blocos de anos.
     anos_por_requisicao: 10
+    # `faixa: [min, max]` é a faixa plausível da série. Valores fora dela fazem a
+    # série ser rejeitada na ingestão, com aviso no log.
+    #
+    # Isto existe porque um código errado do SGS raramente dá erro: ele devolve
+    # *outra* série, com dados perfeitamente válidos e significado nenhum. Foi o
+    # que aconteceu na primeira coleta real — o código que eu havia anotado como
+    # "exportações" devolvia valores negativos de seis dígitos. A faixa é o que
+    # transforma esse erro silencioso em falha visível.
     series:
-      - { codigo: 432,   nome: "Selic meta",                    unidade: "% a.a.",        pais: BR }
-      - { codigo: 11,    nome: "Selic over",                    unidade: "% a.d.",        pais: BR }
-      - { codigo: 12,    nome: "CDI",                           unidade: "% a.d.",        pais: BR }
-      - { codigo: 4389,  nome: "Selic acumulada anualizada",    unidade: "% a.a.",        pais: BR }
-      - { codigo: 1,     nome: "Dólar PTAX venda",              unidade: "R$/US$",        pais: BR }
-      - { codigo: 10813, nome: "Dólar PTAX compra",             unidade: "R$/US$",        pais: BR }
-      - { codigo: 433,   nome: "IPCA mensal",                   unidade: "% a.m.",        pais: BR }
-      - { codigo: 13522, nome: "IPCA acumulado 12 meses",       unidade: "%",             pais: BR }
-      - { codigo: 189,   nome: "IGP-M mensal",                  unidade: "% a.m.",        pais: BR }
-      - { codigo: 24363, nome: "IBC-Br",                        unidade: "índice",        pais: BR }
-      - { codigo: 24364, nome: "IBC-Br dessazonalizado",        unidade: "índice",        pais: BR }
-      - { codigo: 24369, nome: "Taxa de desocupação (PNADC)",   unidade: "%",             pais: BR }
-      - { codigo: 2255,  nome: "Exportações (FOB)",             unidade: "US$ milhões",   pais: BR }
-      - { codigo: 2256,  nome: "Importações (FOB)",             unidade: "US$ milhões",   pais: BR }
-      - { codigo: 2257,  nome: "Saldo da balança comercial",    unidade: "US$ milhões",   pais: BR }
-      - { codigo: 4192,  nome: "Reservas internacionais",       unidade: "US$ milhões",   pais: BR }
-      - { codigo: 4503,  nome: "Dívida líquida do setor público", unidade: "% do PIB",    pais: BR }
+      - { codigo: 432,   nome: "Selic meta",                     unidade: "% a.a.",      pais: BR, faixa: [0, 50] }
+      - { codigo: 11,    nome: "Selic over",                     unidade: "% a.d.",      pais: BR, faixa: [0, 0.5] }
+      - { codigo: 12,    nome: "CDI",                            unidade: "% a.d.",      pais: BR, faixa: [0, 0.5] }
+      - { codigo: 4389,  nome: "Selic acumulada anualizada",     unidade: "% a.a.",      pais: BR, faixa: [0, 50] }
+      - { codigo: 1,     nome: "Dólar PTAX venda",               unidade: "R$/US$",      pais: BR, faixa: [0.5, 20] }
+      - { codigo: 10813, nome: "Dólar PTAX compra",              unidade: "R$/US$",      pais: BR, faixa: [0.5, 20] }
+      - { codigo: 433,   nome: "IPCA mensal",                    unidade: "% a.m.",      pais: BR, faixa: [-3, 5] }
+      - { codigo: 13522, nome: "IPCA acumulado 12 meses",        unidade: "%",           pais: BR, faixa: [-5, 40] }
+      - { codigo: 189,   nome: "IGP-M mensal",                   unidade: "% a.m.",      pais: BR, faixa: [-10, 10] }
+      - { codigo: 24363, nome: "IBC-Br",                         unidade: "índice",      pais: BR, faixa: [50, 200] }
+      - { codigo: 24364, nome: "IBC-Br dessazonalizado",         unidade: "índice",      pais: BR, faixa: [50, 200] }
+      - { codigo: 24369, nome: "Taxa de desocupação (PNADC)",    unidade: "%",           pais: BR, faixa: [2, 30] }
+      - { codigo: 4503,  nome: "Dívida líquida do setor público", unidade: "% do PIB",   pais: BR, faixa: [0, 120] }
+
+    # Removidas na revisão da primeira coleta real, por não serem o que o nome
+    # dizia. Reencontre os códigos corretos em https://www3.bcb.gov.br/sgspub/
+    # e confirme com `tesouraria sgs-probe` antes de reativar:
+    #   2255 — anotada como "Exportações (FOB)"; devolvia até -171.782 (export
+    #          não é negativa) e média 360, contra os ~30.000 US$ mi/mês reais
+    #   2256, 2257 — 404, não existem
+    #   4192 — anotada como "Reservas internacionais"; devolvia 2.527.885 contra
+    #          os ~340.000 US$ mi reais
 
   fx_flow:
     descricao: "Fluxo cambial contratado (movimento de câmbio) do Banco Central"
     url_template: "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados"
     fixture: "fx_flow.json"
-    verificar: true   # confirme os códigos abaixo no buscador do SGS
-    series:
-      - { codigo: 22707, segmento: comercial,  medida: compras }
-      - { codigo: 22708, segmento: comercial,  medida: vendas }
-      - { codigo: 22709, segmento: comercial,  medida: saldo }
-      - { codigo: 22710, segmento: financeiro, medida: compras }
-      - { codigo: 22711, segmento: financeiro, medida: vendas }
-      - { codigo: 22712, segmento: financeiro, medida: saldo }
-      - { codigo: 22713, segmento: total,      medida: compras }
-      - { codigo: 22714, segmento: total,      medida: vendas }
-      - { codigo: 22715, segmento: total,      medida: saldo }
+    # DESATIVADA até que os códigos corretos sejam identificados.
+    #
+    # Os códigos 22707–22715 eram um palpite, e a primeira coleta real provou
+    # que estavam errados. As evidências, medidas sobre os próprios dados:
+    #
+    #   * `comercial` e `financeiro` tinham correlação 1,000000 e diferença
+    #     média de 0,46 — eram a mesma série, não dois segmentos;
+    #   * `comercial + financeiro` não batia com `total`: erro médio de 36.881;
+    #   * `total` ficava entre -33 e -8, mil vezes menor que as outras duas, e
+    #     negativo em 139 de 139 observações — era isto que a interface exibia
+    #     como "fluxo cambial sempre negativo";
+    #   * a periodicidade era mensal, não semanal;
+    #   * a correlação com a balança comercial era +0,19, quando o fluxo
+    #     comercial deveria acompanhá-la de perto.
+    #
+    # Mostrar esses números seria pior que não mostrar nada. Enquanto a lista
+    # estiver vazia, a fonte é registrada como `pulado` e a página de fluxo
+    # cambial explica o que falta.
+    #
+    # Para reativar: rode o workflow "Sondar séries do SGS" varrendo a faixa
+    # 22600–22800, identifique no log as séries semanais em US$ milhões com
+    # troca de sinal, e preencha abaixo.
+    series: []
     periodicidade: semanal
 
   focus:
@@ -166,11 +191,12 @@ sources:
     url_template: "https://apisidra.ibge.gov.br/values/t/{tabela}/n1/all/v/{variavel}/p/all"
     fixture: "ibge_sidra.json"
     series:
-      - { tabela: 1737, variavel: 63,   nome: "IPCA variação mensal",            unidade: "%" }
-      - { tabela: 1737, variavel: 2265, nome: "IPCA acumulado 12 meses",         unidade: "%" }
-      - { tabela: 6381, variavel: 4099, nome: "Taxa de desocupação",             unidade: "%" }
-      - { tabela: 5932, variavel: 6564, nome: "PIB variação anual",              unidade: "%" }
-      - { tabela: 8880, variavel: 7169, nome: "Comércio varejista (PMC)",        unidade: "índice" }
+      - { tabela: 1737, variavel: 63,   nome: "IPCA variação mensal",    unidade: "%", faixa: [-3, 5] }
+      - { tabela: 1737, variavel: 2265, nome: "IPCA acumulado 12 meses", unidade: "%", faixa: [-5, 40] }
+      - { tabela: 6381, variavel: 4099, nome: "Taxa de desocupação",     unidade: "%", faixa: [2, 30] }
+    # Removidas: 5932-6564 (PIB) e 8880-7169 (PMC) devolveram só NaN na coleta
+    # real — a combinação tabela/variável existe, mas não traz valor. Confirme
+    # o par correto em https://sidra.ibge.gov.br/ antes de reativar.
 
   # -------------------------------------------------------------- macro EUA
   us_macro:
@@ -179,14 +205,24 @@ sources:
     fixture: "us_macro.json"
     # Sem FRED_API_KEY a fonte é pulada e registrada como tal em ingest_log.
     series:
-      - { serie_id: "FEDFUNDS",  nome: "Fed Funds effective rate", unidade: "% a.a." }
-      - { serie_id: "DFF",       nome: "Fed Funds diário",         unidade: "% a.a." }
-      - { serie_id: "CPIAUCSL",  nome: "CPI",                      unidade: "índice" }
-      - { serie_id: "CPILFESL",  nome: "Core CPI",                 unidade: "índice" }
-      - { serie_id: "UNRATE",    nome: "Taxa de desemprego",       unidade: "%" }
-      - { serie_id: "PAYEMS",    nome: "Nonfarm payrolls",         unidade: "mil pessoas" }
-      - { serie_id: "DTWEXBGS",  nome: "Dollar index (broad)",     unidade: "índice" }
-      - { serie_id: "T10Y2Y",    nome: "Inclinação 10a-2a",        unidade: "p.p." }
+      - { serie_id: "FEDFUNDS",  nome: "Fed Funds effective rate", unidade: "% a.a.",     faixa: [0, 25] }
+      - { serie_id: "DFF",       nome: "Fed Funds diário",         unidade: "% a.a.",     faixa: [0, 25] }
+      - { serie_id: "CPIAUCSL",  nome: "CPI",                      unidade: "índice",     faixa: [100, 1000] }
+      - { serie_id: "CPILFESL",  nome: "Core CPI",                 unidade: "índice",     faixa: [100, 1000] }
+      - { serie_id: "UNRATE",    nome: "Taxa de desemprego",       unidade: "%",          faixa: [1, 30] }
+      - { serie_id: "PAYEMS",    nome: "Nonfarm payrolls",         unidade: "mil pessoas", faixa: [50000, 400000] }
+      - { serie_id: "T10Y2Y",    nome: "Inclinação 10a-2a",        unidade: "p.p.", faixa: [-5, 5] }
+
+      # Cestas do dólar, usadas no prêmio do real (analytics/currency.py).
+      #
+      # A `broad` inclui o próprio real: serve de referência geral, mas não
+      # para medir o descolamento do real — parte do movimento apareceria dos
+      # dois lados da conta. As duas abaixo excluem o Brasil e são as réguas:
+      #   avançadas — o análogo mais fiel ao DXY da ICE;
+      #   emergentes — responde "o real andou pior que os pares?".
+      - { serie_id: "DTWEXBGS",   nome: "Dólar — cesta ampla",       unidade: "índice", faixa: [50, 200] }
+      - { serie_id: "DTWEXAFEGS", nome: "Dólar — economias avançadas", unidade: "índice", faixa: [50, 200] }
+      - { serie_id: "DTWEXEMEGS", nome: "Dólar — emergentes",        unidade: "índice", faixa: [50, 250] }
 
 # Grade padrão de vértices (em anos) usada para tornar as curvas comparáveis.
 grade_padrao: [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0]

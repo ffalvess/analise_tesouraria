@@ -32,9 +32,14 @@ discursos:
     tipo: comunicado
     idioma: en
 
+  # Os três feeds do BCB deram `400 Bad Request` na primeira coleta real, com o
+  # caminho /api/feed/sitebcb/<slug>. O padrão abaixo (/api/servico/, sufixo
+  # /ultimas e parâmetro de quantidade) é a forma que o site usa hoje.
+  # Continua sendo uma hipótese — mas agora o log traz o corpo da resposta,
+  # então a próxima execução diz exatamente o que o servidor recusou.
   - nome: "BCB — Discursos e entrevistas"
     instituicao: BCB
-    url: "https://www.bcb.gov.br/api/feed/sitebcb/discursosentrevistas"
+    url: "https://www.bcb.gov.br/api/servico/sitebcb/discursosentrevistas/ultimas?quantidade=100&filtro="
     formato: json_bcb
     tipo: discurso
     idioma: pt
@@ -42,7 +47,7 @@ discursos:
 
   - nome: "BCB — Notas e atas do Copom"
     instituicao: BCB
-    url: "https://www.bcb.gov.br/api/feed/sitebcb/atascopom"
+    url: "https://www.bcb.gov.br/api/servico/sitebcb/atascopom/ultimas?quantidade=50&filtro="
     formato: json_bcb
     tipo: ata
     idioma: pt
@@ -50,46 +55,26 @@ discursos:
 
   - nome: "BCB — Notícias e comunicados"
     instituicao: BCB
-    url: "https://www.bcb.gov.br/api/feed/sitebcb/noticias"
+    url: "https://www.bcb.gov.br/api/servico/sitebcb/noticias/ultimas?quantidade=100&filtro="
     formato: json_bcb
     tipo: comunicado
     idioma: pt
     verificar: true
 
+# Removidos após a primeira coleta real, por não responderem:
+#   FMI            https://www.imf.org/en/News/RSS?Language=ENG&category=Country  → 403
+#   BIS            https://www.bis.org/list/bis_publs/rss.xml                     → 404
+#   Banco Mundial  https://www.worldbank.org/en/news/all.rss                      → 404
+#   IPEA           https://www.ipea.gov.br/cartadeconjuntura/index.php/feed/      → timeout
+# Uma lista curta que funciona vale mais que uma longa que enche o log de aviso.
+# Se encontrar as URLs novas, basta acrescentá-las aqui.
 research:
-  - nome: "FMI — Brasil"
-    instituicao: FMI
-    url: "https://www.imf.org/en/News/RSS?Language=ENG&category=Country"
-    tipo: relatorio
-    idioma: en
-    filtro_titulo: ["Brazil", "Brasil"]
-
-  - nome: "BIS — Publicações"
-    instituicao: BIS
-    url: "https://www.bis.org/list/bis_publs/rss.xml"
-    tipo: relatorio
-    idioma: en
-
-  - nome: "Banco Mundial — Comunicados"
-    instituicao: "Banco Mundial"
-    url: "https://www.worldbank.org/en/news/all.rss"
-    tipo: relatorio
-    idioma: en
-    filtro_titulo: ["Brazil", "Brasil"]
-
   - nome: "Fitch Ratings — Comunicados"
     instituicao: Fitch
     url: "https://www.fitchratings.com/rss/press-releases"
     tipo: rating
     idioma: en
     filtro_titulo: ["Brazil", "Brasil"]
-    verificar: true
-
-  - nome: "IPEA — Carta de Conjuntura"
-    instituicao: IPEA
-    url: "https://www.ipea.gov.br/cartadeconjuntura/index.php/feed/"
-    tipo: relatorio
-    idioma: pt
     verificar: true
 
   - nome: "FGV IBRE — Blog da Conjuntura Econômica"

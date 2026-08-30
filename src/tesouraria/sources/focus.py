@@ -82,15 +82,18 @@ class FocusSource(Source):
         valores: list[dict] = []
         skip = 0
         while True:
+            # Consulta deliberadamente mínima. A primeira coleta real devolveu
+            # `400 Bad Request`, e `$orderby` e `$select` eram os suspeitos —
+            # o Olinda é restritivo quanto ao que aceita neles. Ordenar e
+            # selecionar colunas sai mais barato no pandas do que arriscar a
+            # requisição inteira.
             bruto = self.get(
                 f"{cfg['url_base']}/{endpoint}",
                 params={
                     "$top": pagina,
                     "$skip": skip,
                     "$filter": filtro,
-                    "$select": ",".join(CAMPOS),
                     "$format": "json",
-                    "$orderby": "Data",
                 },
             )
             lote = json.loads(bruto.decode("utf-8")).get("value", [])

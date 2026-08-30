@@ -22,6 +22,9 @@ feedparser==6.0.14
 pypdf==6.16.2
 beautifulsoup4==4.15.0
 lxml==6.1.2
+# Parser de reserva do pandas.read_html: sem ele, a leitura do boletim da B3
+# falha num ambiente limpo, onde nao vem como dependencia transitiva.
+html5lib==1.1
 python-dateutil==2.9.0.post0
 
 # Instala o próprio pacote `tesouraria` a partir do pyproject.toml.

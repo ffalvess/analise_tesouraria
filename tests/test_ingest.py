@@ -36,8 +36,22 @@ def test_todas_as_fontes_ingerem_sem_erro(ambiente_ingerido):
 
 def test_tabelas_ficam_populadas(ambiente_ingerido):
     cobertura = db.table_coverage().set_index("tabela")
-    for tabela in ("curve_br", "curve_us", "series_macro", "focus", "fx_flow", "documentos"):
+    # `fx_flow` fica de fora: a fonte está desativada até os códigos do SGS
+    # serem confirmados — ver a nota em config/sources.yaml.
+    for tabela in ("curve_br", "curve_us", "series_macro", "focus", "documentos"):
         assert cobertura.loc[tabela, "linhas"] > 0, f"{tabela} ficou vazia"
+
+
+def test_fluxo_cambial_fica_pulado_e_nao_vazio(ambiente_ingerido):
+    """Sem códigos confirmados, a fonte tem de se declarar — não sumir calada.
+
+    `pulado` com motivo é o que faz o rodapé da interface e o log do workflow
+    explicarem a ausência. `vazio` seria indistinguível de "não houve dado".
+    """
+    status = db.status_report().set_index("fonte")
+
+    assert status.loc["fx_flow", "status"] == "pulado"
+    assert "não confirmados" in status.loc["fx_flow", "erro"]
 
 
 def test_ingestao_repetida_e_idempotente(ambiente_ingerido):

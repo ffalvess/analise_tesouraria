@@ -119,16 +119,28 @@ def test_parse_sgs_formato_invalido():
 # -------------------------------------------------------------- fluxo cambial
 
 
-def test_fx_flow_pivot(fixtures_dir):
-    payload = json.loads(ler(fixtures_dir, "fx_flow.json"))
-    config = FxFlowSource().config
+def test_fx_flow_pivot():
+    """A lógica de pivô continua correta, mesmo com a fonte desativada.
 
+    O teste monta a entrada longa diretamente em vez de ler a lista de séries
+    da configuração: os códigos do SGS foram removidos de lá por estarem
+    errados, e a mecânica do pivô não deveria depender disso para ser testada.
+    """
+    datas = [dt.date(2026, 8, 21), dt.date(2026, 8, 28)]
     partes = []
-    for serie in config["series"]:
-        parcial = parse_sgs(payload[str(serie["codigo"])], str(serie["codigo"]))
-        parcial["segmento"] = serie["segmento"]
-        parcial["medida"] = serie["medida"]
-        partes.append(parcial)
+    for segmento, base in (("comercial", 5_000.0), ("financeiro", 9_000.0), ("total", 14_000.0)):
+        for medida, ajuste in (("compras", 0.0), ("vendas", -1_200.0), ("saldo", 1_200.0)):
+            partes.append(
+                pd.DataFrame(
+                    {
+                        "serie_id": f"{segmento}-{medida}",
+                        "data_ref": datas,
+                        "valor": [base + ajuste, base + ajuste + 100],
+                        "segmento": segmento,
+                        "medida": medida,
+                    }
+                )
+            )
 
     largo = FxFlowSource.pivot(pd.concat(partes, ignore_index=True))
 

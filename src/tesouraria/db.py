@@ -221,6 +221,42 @@ def log_ingest(
     )
 
 
+def podar(con: duckdb.DuckDBPyConnection, declaradas: set[str]) -> dict[str, int]:
+    """Remove do banco o que a configuração não declara mais.
+
+    Sem isto, uma série retirada de `config/sources.yaml` viveria para sempre:
+    o ciclo do workflow é importar o snapshot, coletar e exportar de novo, e a
+    importação traria de volta as linhas antigas a cada execução. Foi o caso
+    das séries que se revelaram trocadas — elas parariam de ser coletadas, mas
+    continuariam sendo exibidas.
+
+    A regra é simples e vale como invariante: **o banco contém apenas o que a
+    configuração declara**.
+    """
+    removidas: dict[str, int] = {}
+
+    if declaradas:
+        marcadores = ", ".join("?" for _ in declaradas)
+        antes = con.execute("SELECT COUNT(*) FROM series_macro").fetchone()[0]
+        con.execute(
+            f"DELETE FROM series_macro WHERE serie_id NOT IN ({marcadores})",
+            list(declaradas),
+        )
+        depois = con.execute("SELECT COUNT(*) FROM series_macro").fetchone()[0]
+        if antes != depois:
+            removidas["series_macro"] = antes - depois
+
+    return removidas
+
+
+def limpar_tabela(con: duckdb.DuckDBPyConnection, tabela: str) -> int:
+    """Esvazia uma tabela cuja fonte foi desativada."""
+    antes = con.execute(f"SELECT COUNT(*) FROM {tabela}").fetchone()[0]
+    if antes:
+        con.execute(f"DELETE FROM {tabela}")
+    return antes
+
+
 def status_report() -> pd.DataFrame:
     """Frescor por fonte: última execução, status e cobertura de datas."""
     with connection(read_only=True) as con:

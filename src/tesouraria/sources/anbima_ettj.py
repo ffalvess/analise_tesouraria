@@ -38,6 +38,7 @@ class AnbimaEttjSource(Source):
         cfg = self.config
         datas = self._datas(since)
         quadros: list[pd.DataFrame] = []
+        ultimo_erro: str | None = None
 
         for data_ref in datas:
             try:
@@ -54,11 +55,19 @@ class AnbimaEttjSource(Source):
                 )
                 quadros.append(self.parse(raw, data_ref=data_ref))
             except Exception as exc:  # noqa: BLE001 — dia sem pregão é comum
-                logger.info("ANBIMA ETTJ sem dados para %s: %s", data_ref, exc)
+                ultimo_erro = f"{type(exc).__name__}: {exc}"
+                logger.warning("ANBIMA ETTJ sem dados para %s: %s", data_ref, exc)
 
         quadros = [q for q in quadros if not q.empty]
         if not quadros:
-            return pd.DataFrame()
+            # Nenhum pregão rendeu dado. Levantar, em vez de devolver vazio, é o
+            # que distingue "a fonte está quebrada" de "não houve pregão" — as
+            # duas apareciam como `vazio` no rodapé, e foi assim que a falta do
+            # html5lib passou despercebida na primeira coleta real.
+            raise RuntimeError(
+                f"nenhuma das {len(datas)} datas consultadas devolveu dados; "
+                f"último erro: {ultimo_erro}"
+            )
         return pd.concat(quadros, ignore_index=True)
 
     def parse(self, raw: bytes, data_ref: dt.date | None = None) -> pd.DataFrame:
