@@ -122,7 +122,9 @@ def comando_ingest(args: argparse.Namespace) -> int:
                 print(f"  podadas {quantas} linhas de {tabela} (séries não declaradas)")
 
             if not source_config("fx_flow").get("series"):
-                limpas = db.limpar_tabela(con, "fx_flow")
+                limpas = db.limpar_tabela(
+                    con, "fx_flow", fontes=sources.fontes_da_tabela("fx_flow")
+                )
                 if limpas:
                     print(f"  limpas {limpas} linhas de fx_flow (fonte desativada)")
 

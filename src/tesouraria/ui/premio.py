@@ -14,9 +14,14 @@ import streamlit as st
 from tesouraria.analytics import currency
 from tesouraria.ui import charts, common
 
-# Só cestas que excluem o real. A `DTWEXBGS` (ampla) inclui o próprio real e
-# amorteceria o resultado — ela continua no banco, mas não serve de régua aqui.
+# Réguas preferidas: cestas que excluem o real, então todo o descolamento medido
+# é do real contra os outros.
 CESTAS = {"DTWEXAFEGS": "economias avançadas", "DTWEXEMEGS": "emergentes"}
+
+# Reserva, usada só quando nenhuma das preferidas está no banco. A `DTWEXBGS`
+# inclui o próprio real, o que amortece o prêmio — mas amortecido e honesto é
+# melhor que ausente: sem ela a tela inteira vira um aviso de dado faltando.
+CESTA_RESERVA = {"DTWEXBGS": "ampla"}
 
 EXPLICACAO = (
     "Separa duas coisas que o gráfico do dólar sozinho confunde: o dólar subiu "
@@ -27,17 +32,40 @@ EXPLICACAO = (
 
 SEM_DADOS = (
     "O prêmio do real precisa da PTAX e de ao menos uma cesta do FRED "
-    "(`DTWEXAFEGS` ou `DTWEXEMEGS`). Rode `tesouraria ingest --source us_macro` "
-    "com a `FRED_API_KEY` configurada."
+    "(`DTWEXAFEGS`, `DTWEXEMEGS` ou `DTWEXBGS`). Rode "
+    "`tesouraria ingest --source us_macro` com a `FRED_API_KEY` configurada."
+)
+
+RESSALVA_RESERVA = (
+    "**Medido contra a cesta ampla (`DTWEXBGS`), que inclui o próprio real.** "
+    "Parte do movimento entra dos dois lados da conta, então o prêmio sai "
+    "**amortecido**: leia o número como piso, não como medida exata. As réguas "
+    "que excluem o Brasil (`DTWEXAFEGS` e `DTWEXEMEGS`) entram no banco na "
+    "próxima coleta e assumem este bloco sozinhas."
 )
 
 
-def cestas_disponiveis() -> dict[str, str]:
-    return {
+def cestas_disponiveis() -> tuple[dict[str, str], bool]:
+    """Cestas utilizáveis e se o que sobrou foi a de reserva.
+
+    A flag existe para a tela poder dizer o que está medindo: um prêmio contra a
+    cesta ampla é uma leitura diferente de um prêmio contra as cestas que
+    excluem o real, e apresentar os dois do mesmo jeito seria enganoso.
+    """
+    preferidas = {
         serie_id: rotulo
         for serie_id, rotulo in CESTAS.items()
         if not common.cache_serie(serie_id).empty
     }
+    if preferidas:
+        return preferidas, False
+
+    reserva = {
+        serie_id: rotulo
+        for serie_id, rotulo in CESTA_RESERVA.items()
+        if not common.cache_serie(serie_id).empty
+    }
+    return reserva, bool(reserva)
 
 
 def _bases(cambio: pd.DataFrame, cestas: dict[str, str]) -> dict[str, pd.DataFrame]:
@@ -112,7 +140,7 @@ def premio_do_dia(cambio: pd.DataFrame) -> float:
 
     Serve ao indicador do topo do painel, que precisa de um número só.
     """
-    cestas = cestas_disponiveis()
+    cestas, _ = cestas_disponiveis()
     if cambio.empty or not cestas:
         return float("nan")
 
@@ -126,10 +154,12 @@ def bloco_compacto(cambio: pd.DataFrame, chave: str = "painel") -> None:
     st.subheader("Dólar × cesta de moedas")
     st.caption(EXPLICACAO)
 
-    cestas = cestas_disponiveis()
+    cestas, reserva = cestas_disponiveis()
     if cambio.empty or not cestas:
         st.info(SEM_DADOS)
         return
+    if reserva:
+        st.warning(RESSALVA_RESERVA, icon="⚠️")
 
     janela = st.radio(
         "Janela", list(currency.JANELAS), horizontal=True, index=0, key=f"janela_{chave}"
@@ -149,7 +179,8 @@ def secao_premio(cambio: pd.DataFrame, chave: str = "cambio") -> None:
     """Seção completa: a leitura do dia mais o histórico e o beta móvel."""
     bloco_compacto(cambio, chave)
 
-    cestas = cestas_disponiveis()
+    # A ressalva da cesta de reserva já saiu no bloco acima; aqui só o dado.
+    cestas, _ = cestas_disponiveis()
     if cambio.empty or not cestas:
         return
 

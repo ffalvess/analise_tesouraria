@@ -21,10 +21,14 @@ interface: prêmio **positivo** = o real se desvalorizou **além** do que o dól
 global explica — algo específico do Brasil. Negativo = o real andou melhor que
 a cesta.
 
-A cesta nunca deve ser a `DTWEXBGS` (ampla), porque ela **inclui o próprio
-real**: parte do movimento entraria dos dois lados da conta e amorteceria o
-resultado. As réguas são `DTWEXAFEGS` (economias avançadas) e `DTWEXEMEGS`
-(emergentes), que excluem o Brasil.
+As réguas são `DTWEXAFEGS` (economias avançadas) e `DTWEXEMEGS` (emergentes),
+que excluem o Brasil. A `DTWEXBGS` (ampla) **inclui o próprio real**, então
+parte do movimento entra dos dois lados da conta e o prêmio sai amortecido —
+serve apenas de reserva, quando nenhuma das duas está no banco, e sempre com a
+ressalva na tela (`ui/premio.py::CESTA_RESERVA`). Amortecido e rotulado é
+melhor que ausente: sem essa reserva, a tela inteira vira um aviso de dado
+faltando, que foi como a página de fluxo cambial ficou publicada sem análise
+nenhuma.
 """
 
 from __future__ import annotations

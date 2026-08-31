@@ -300,3 +300,41 @@ def test_tamanho_em_disco(banco_com_dados, banco_temporario):
 
     snapshots.exportar(banco_com_dados, destino)
     assert snapshots.tamanho(destino) > 0
+
+
+# ------------------------------------- coerência dos snapshots versionados
+
+RAIZ = Path(__file__).resolve().parents[1]
+SNAPSHOTS_DO_REPO = RAIZ / "data" / "snapshots"
+
+
+@pytest.mark.skipif(
+    not (SNAPSHOTS_DO_REPO / snapshots.ARQUIVO_LOG).exists(),
+    reason="sem snapshots versionados no repositório",
+)
+def test_nenhuma_fonte_declara_linhas_sobre_tabela_vazia():
+    """O rodapé do aplicativo publicado lê este registro como frescor dos dados.
+
+    Quando uma fonte é desativada e a sua tabela é esvaziada, o registro de
+    ingestão precisa ir junto: `_importar_log` só faz upsert e nunca remove, de
+    modo que um `ok, 417 linhas` sobrevive à purga e viaja no snapshot. Foi o
+    que aconteceu com o `fx_flow` — a mesma tela avisava que a fonte estava
+    desativada e garantia, no rodapé, uma coleta bem-sucedida.
+    """
+    from tesouraria import sources
+
+    con = duckdb.connect()
+    log = con.execute(
+        f"SELECT fonte, status, linhas FROM "
+        f"read_parquet('{(SNAPSHOTS_DO_REPO / snapshots.ARQUIVO_LOG).as_posix()}')"
+    ).df()
+
+    mentiras = []
+    for _, linha in log.iterrows():
+        tabela = sources.TABELA_DA_FONTE.get(linha["fonte"])
+        if tabela is None or not (linha["linhas"] or 0) > 0:
+            continue
+        if not any((SNAPSHOTS_DO_REPO / tabela).glob("*.parquet")):
+            mentiras.append(f"{linha['fonte']} diz {linha['linhas']} linhas, {tabela} está vazia")
+
+    assert not mentiras, "registro de ingestão incoerente: " + "; ".join(mentiras)

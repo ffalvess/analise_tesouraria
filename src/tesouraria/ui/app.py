@@ -89,8 +89,9 @@ else:
         "Prêmio do real (dia)",
         charts.formatar_pct(premio_ui.premio_do_dia(cambio)),
         help=(
-            "Δ% do dólar menos Δ% da cesta de economias avançadas. Positivo = o real "
-            "perdeu além do que o dólar global explica. Detalhes no bloco abaixo."
+            "Δ% do dólar menos Δ% da cesta de moedas. Positivo = o real perdeu além "
+            "do que o dólar global explica. Qual cesta, e a ressalva quando é a de "
+            "reserva, está no bloco abaixo."
         ),
     )
 

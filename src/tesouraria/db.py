@@ -249,11 +249,29 @@ def podar(con: duckdb.DuckDBPyConnection, declaradas: set[str]) -> dict[str, int
     return removidas
 
 
-def limpar_tabela(con: duckdb.DuckDBPyConnection, tabela: str) -> int:
-    """Esvazia uma tabela cuja fonte foi desativada."""
+def limpar_tabela(
+    con: duckdb.DuckDBPyConnection, tabela: str, fontes: Sequence[str] = ()
+) -> int:
+    """Esvazia uma tabela cuja fonte foi desativada.
+
+    Apaga junto os registros de ingestão que **afirmam linhas** para essa
+    tabela. Um `fx_flow · ok · 417 linhas` sobrevivendo a uma tabela vazia não é
+    detalhe: `snapshots._importar_log` nunca remove nada, então a linha viaja no
+    snapshot e o rodapé "Frescor dos dados" passa a garantir frescor que não
+    existe, na mesma tela em que o corpo avisa que a fonte está desativada.
+
+    Só os registros que alegam linhas somem. Um `pulado` ou um `vazio` continua,
+    porque é exatamente o que aconteceu e é o que explica a ausência.
+    """
     antes = con.execute(f"SELECT COUNT(*) FROM {tabela}").fetchone()[0]
     if antes:
         con.execute(f"DELETE FROM {tabela}")
+
+    for fonte in fontes:
+        con.execute(
+            "DELETE FROM ingest_log WHERE fonte = ? AND coalesce(linhas, 0) > 0",
+            [fonte],
+        )
     return antes
 
 

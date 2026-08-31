@@ -140,6 +140,29 @@ def test_limpar_tabela(con):
     assert db.limpar_tabela(con, "curve_br") == 0
 
 
+def test_limpar_tabela_apaga_o_registro_que_afirma_linhas(con):
+    """Um `ok, 417 linhas` sobre tabela vazia mente no rodapé por meses.
+
+    `snapshots._importar_log` nunca remove nada, então o registro viaja no
+    snapshot: a mesma tela dizia que a fonte estava desativada e que a última
+    coleta trouxe 417 linhas.
+    """
+    db.log_ingest(con, "fx_flow", "ok", 417, "rede")
+    db.limpar_tabela(con, "fx_flow", fontes=("fx_flow",))
+
+    restantes = con.execute("SELECT COUNT(*) FROM ingest_log WHERE fonte = 'fx_flow'").fetchone()
+    assert restantes[0] == 0
+
+
+def test_limpar_tabela_preserva_o_registro_de_pulado(con):
+    """`pulado` com motivo é o que explica a ausência; some seria pior."""
+    db.log_ingest(con, "fx_flow", "pulado", 0, "rede", "códigos não confirmados")
+    db.limpar_tabela(con, "fx_flow", fontes=("fx_flow",))
+
+    status = con.execute("SELECT status FROM ingest_log WHERE fonte = 'fx_flow'").fetchall()
+    assert [linha[0] for linha in status] == ["pulado"]
+
+
 def test_log_e_status(con, banco_temporario):
     db.log_ingest(con, "tesouro_direto", "ok", 100, "fixture")
     db.log_ingest(con, "focus", "erro", 0, "rede", "timeout")

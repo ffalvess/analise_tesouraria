@@ -36,6 +36,28 @@ REGISTRO: dict[str, type[Source]] = {
 }
 
 
+# Qual tabela cada fonte alimenta. Serve à invariante que o rodapé depende de
+# manter: uma fonte não pode declarar linhas coletadas sobre uma tabela vazia.
+TABELA_DA_FONTE: dict[str, str] = {
+    "tesouro_direto": "curve_br",
+    "anbima_ettj": "curve_br",
+    "b3_di": "curve_br",
+    "us_treasury": "curve_us",
+    "bcb_sgs": "series_macro",
+    "comex": "series_macro",
+    "ibge_sidra": "series_macro",
+    "us_macro": "series_macro",
+    "fx_flow": "fx_flow",
+    "focus": "focus",
+    "speeches": "documentos",
+    "research": "documentos",
+}
+
+
+def fontes_da_tabela(tabela: str) -> tuple[str, ...]:
+    return tuple(f for f, t in TABELA_DA_FONTE.items() if t == tabela)
+
+
 def criar(nome: str) -> Source:
     if nome not in REGISTRO:
         disponiveis = ", ".join(REGISTRO)
@@ -70,4 +92,12 @@ def series_declaradas() -> set[str]:
     return declaradas
 
 
-__all__ = ["REGISTRO", "IngestResult", "Source", "criar", "todas"]
+__all__ = [
+    "REGISTRO",
+    "TABELA_DA_FONTE",
+    "IngestResult",
+    "Source",
+    "criar",
+    "fontes_da_tabela",
+    "todas",
+]

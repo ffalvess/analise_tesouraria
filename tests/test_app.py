@@ -16,7 +16,13 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
-UI = Path(__file__).resolve().parents[1] / "src" / "tesouraria" / "ui"
+RAIZ = Path(__file__).resolve().parents[1]
+UI = RAIZ / "src" / "tesouraria" / "ui"
+FIXTURES = RAIZ / "data" / "fixtures"
+SNAPSHOTS = RAIZ / "data" / "snapshots"
+
+# Um clone sem os Parquet versionados não pode falhar por ausência de dados.
+TEM_SNAPSHOTS = any(SNAPSHOTS.glob("*/*.parquet"))
 
 PAGINAS = [
     UI / "app.py",
@@ -56,6 +62,84 @@ def test_pagina_produz_conteudo(pagina, ambiente_ingerido):
         len(app.markdown) or len(app.dataframe) or len(app.metric) or len(app.caption)
     )
     assert tem_conteudo, f"{pagina.name} não renderizou nenhum elemento"
+
+
+@pytest.fixture
+def ambiente_producao(tmp_path):
+    """O container publicado, com os snapshots **reais** do repositório.
+
+    A diferença para `ambiente_so_com_snapshots` é o que este arnês existe para
+    cobrir: aquele exporta Parquet a partir das mesmas amostras sintéticas, em
+    que toda série declarada existe e nenhuma tabela está vazia. Os dados reais
+    têm buracos — séries que a coleta não trouxe, fontes desativadas — e buraco
+    é o que quebra tela. Foi assim que a página de fluxo cambial chegou
+    publicada com traceback: nenhum teste jamais executou o caminho em que uma
+    série que o código espera simplesmente não está no banco.
+    """
+    from tesouraria.settings import get_settings
+
+    destino = tmp_path / "dados"
+    destino.mkdir()
+    (destino / "fixtures").symlink_to(FIXTURES, target_is_directory=True)
+    shutil.copytree(SNAPSHOTS, destino / "snapshots")
+
+    anterior = os.environ.get("TESOURARIA_DATA_DIR")
+    offline_anterior = os.environ.pop("TESOURARIA_OFFLINE", None)
+    os.environ["TESOURARIA_DATA_DIR"] = str(destino)
+    get_settings.cache_clear()
+    st.cache_resource.clear()
+    st.cache_data.clear()
+
+    assert not (destino / "tesouraria.duckdb").exists()
+    yield destino
+
+    if anterior is None:
+        os.environ.pop("TESOURARIA_DATA_DIR", None)
+    else:
+        os.environ["TESOURARIA_DATA_DIR"] = anterior
+    if offline_anterior is not None:
+        os.environ["TESOURARIA_OFFLINE"] = offline_anterior
+    get_settings.cache_clear()
+    st.cache_resource.clear()
+    st.cache_data.clear()
+
+
+@pytest.mark.skipif(not TEM_SNAPSHOTS, reason="sem snapshots reais no repositório")
+@pytest.mark.parametrize("pagina", PAGINAS, ids=rotulo)
+def test_pagina_renderiza_com_os_dados_reais(pagina, ambiente_producao):
+    """As dez telas contra os dados que estão publicados de verdade.
+
+    O teste irmão, sobre as amostras, garante que a lógica funciona quando tudo
+    está presente. Este garante que ela não explode quando não está.
+    """
+    app = AppTest.from_file(str(pagina), default_timeout=TEMPO_LIMITE)
+    app.run()
+
+    assert not app.exception, (
+        f"{pagina.name} levantou exceção com os dados reais: "
+        + " | ".join(str(e.message) for e in app.exception)
+    )
+
+
+@pytest.mark.skipif(not TEM_SNAPSHOTS, reason="sem snapshots reais no repositório")
+def test_fluxo_cambial_entrega_analise_com_os_dados_reais(ambiente_producao):
+    """Renderizar sem exceção não é o critério: a tela precisa analisar algo.
+
+    Foi exatamente assim que esta página chegou publicada — sem erro nenhum, e
+    sem uma única conta: a fonte de fluxo está desativada e as cestas que o
+    prêmio preferia não tinham sido coletadas, então sobravam dois avisos. Um
+    teste que só olha `app.exception` chama isso de sucesso.
+    """
+    app = AppTest.from_file(str(UI / "pages" / "5_Fluxo_Cambial.py"), default_timeout=TEMPO_LIMITE)
+    app.run()
+
+    assert not app.exception, " | ".join(str(e.message) for e in app.exception)
+
+    rotulos = [m.label for m in app.metric]
+    assert any("Prêmio" in r for r in rotulos), (
+        f"a página não calculou nenhum prêmio; métricas presentes: {rotulos}"
+    )
+    assert any("Dólar" in r for r in rotulos)
 
 
 @pytest.fixture
