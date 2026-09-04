@@ -379,3 +379,20 @@ def test_b3_sem_tabela_e_resposta_vazia():
 
     with pytest.raises(ValueError, match="resposta vazia"):
         B3DiSource().parse(b"   ", data_ref=dt.date(2026, 8, 28))
+
+
+@pytest.mark.parametrize(
+    ("nome", "esperado"),
+    [
+        ("22704-sgs", "22704"),
+        ("1-taxa-de-cambio---livre---dolar-americano-venda---diario", "1"),
+        ("20542-saldo-da-carteira-de-credito-com-recursos-livres---total", "20542"),
+        ("sgs-sem-codigo", None),
+        ("", None),
+    ],
+)
+def test_codigo_sai_do_identificador_do_conjunto(nome, esperado):
+    """O portal nomeia os conjuntos de duas formas; as duas abrem pelo código."""
+    from tesouraria.cli import extrair_codigo
+
+    assert extrair_codigo(nome) == esperado

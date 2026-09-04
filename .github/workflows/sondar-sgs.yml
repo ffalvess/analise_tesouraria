@@ -2,10 +2,14 @@ name: Sondar séries do SGS
 
 # Ferramenta de diagnóstico, disparada à mão.
 #
-# O SGS do Banco Central não tem API de metadados: um código errado não dá
-# erro, devolve outra série. Foi assim que os códigos anotados como fluxo
-# cambial entraram no projeto trazendo outra coisa — e como isso só apareceu
-# depois de meses de dados coletados.
+# A consulta ao SGS não valida nada: um código errado não dá erro, devolve
+# outra série. Foi assim que os códigos anotados como fluxo cambial entraram no
+# projeto trazendo outra coisa — e como isso só apareceu depois de meses de
+# dados coletados.
+#
+# Para descobrir o código a partir do nome, use antes o workflow 'Buscar séries
+# do SGS pelo nome'. Esta sonda é o passo de confirmação: dado um código, o que
+# ele de fato devolve.
 #
 # Esta sonda varre uma faixa de códigos e descreve o que cada um devolve:
 # periodicidade, intervalo de datas, ordem de grandeza e se o sinal alterna.

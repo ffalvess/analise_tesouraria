@@ -6,6 +6,7 @@ import argparse
 import datetime as dt
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
@@ -89,6 +90,13 @@ def construir_parser() -> argparse.ArgumentParser:
         default=8.0,
         help="segundos por código antes de desistir (padrão: 8; o SGS pendura em código inexistente)",
     )
+
+    busca = sub.add_parser(
+        "sgs-buscar",
+        help="procura séries do SGS pelo nome, no catálogo de dados abertos do BCB",
+    )
+    busca.add_argument("termo", help='texto a procurar, ex.: "fluxo cambial"')
+    busca.add_argument("--limite", type=int, default=50, help="resultados (padrão: 50)")
 
     serve = sub.add_parser("serve", help="abre a interface Streamlit")
     serve.add_argument("--port", type=int, default=8501)
@@ -187,7 +195,9 @@ def comando_snapshot(args: argparse.Namespace) -> int:
 def comando_sgs_probe(args: argparse.Namespace) -> int:
     """Varre uma faixa de códigos do SGS e descreve o que cada um devolve.
 
-    Existe porque o SGS não tem API de metadados: um código errado não dá erro,
+    Complementa `sgs-buscar`, que descobre o código pelo nome: aqui se confirma
+    o que o código **devolve**, antes de ele entrar em config/sources.yaml. A
+    consulta ao SGS não valida nada — um código errado não dá erro,
     devolve outra série. Foi assim que os códigos de fluxo cambial entraram
     errados e passaram meses de dados sem ninguém notar. Em vez de adivinhar de
     novo, esta sonda mostra periodicidade, ordem de grandeza e troca de sinal —
@@ -264,6 +274,59 @@ def comando_sgs_probe(args: argparse.Namespace) -> int:
     return 0
 
 
+def extrair_codigo(nome: str) -> str | None:
+    """O código do SGS é o número que abre o identificador do conjunto.
+
+    O portal nomeia os conjuntos de duas formas — `22704-sgs` e
+    `1-taxa-de-cambio---livre---dolar-americano-venda---diario` —, e as duas
+    começam pelo código.
+    """
+    achado = re.match(r"(\d+)-", nome or "")
+    return achado.group(1) if achado else None
+
+
+def comando_sgs_buscar(args: argparse.Namespace) -> int:
+    """Procura séries do SGS pelo nome, em vez de adivinhar o número.
+
+    Este projeto carregava a nota de que "o SGS não tem API de metadados", e
+    foi ela que justificou chutar os códigos do fluxo cambial — que se
+    revelaram outra coisa, meses de dados depois. A nota é falsa: o portal de
+    dados abertos do BCB indexa cada série num catálogo CKAN, com o código no
+    identificador do conjunto.
+
+    A varredura numérica (`sgs-probe`) continua útil para confirmar o que um
+    código devolve. Esta busca é o passo anterior, e o certo: descobrir qual é
+    o código.
+    """
+    from tesouraria.http import fetch_json
+
+    url = source_config("bcb_sgs")["catalogo_url"]
+    resposta = fetch_json(
+        url, params={"q": args.termo, "rows": args.limite}, use_cache=False, timeout=30.0
+    )
+    conjuntos = (resposta or {}).get("result", {}).get("results", [])
+
+    if not conjuntos:
+        print(f"Nada encontrado para {args.termo!r}.")
+        return 0
+
+    print(f"{'código':>8}  título")
+    print("-" * 100)
+    achados = 0
+    for conjunto in conjuntos:
+        codigo = extrair_codigo(conjunto.get("name", ""))
+        if codigo is None:
+            continue
+        titulo = (conjunto.get("title") or conjunto.get("notes") or "").strip()
+        print(f"{codigo:>8}  {titulo[:90]}")
+        achados += 1
+
+    total = (resposta or {}).get("result", {}).get("count", achados)
+    print(f"\n{achados} séries exibidas de {total} encontradas para {args.termo!r}.")
+    print("Confirme o conteúdo com: tesouraria sgs-probe --de CÓDIGO --ate CÓDIGO")
+    return 0
+
+
 def comando_serve(args: argparse.Namespace) -> int:
     if args.offline:
         os.environ["TESOURARIA_OFFLINE"] = "1"
@@ -288,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
         "status": comando_status,
         "snapshot": comando_snapshot,
         "sgs-probe": comando_sgs_probe,
+        "sgs-buscar": comando_sgs_buscar,
         "serve": comando_serve,
     }
     return comandos[args.comando](args)

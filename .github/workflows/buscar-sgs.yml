@@ -1,0 +1,51 @@
+name: Buscar séries do SGS pelo nome
+
+# Descobre o código de uma série a partir do nome dela, no catálogo de dados
+# abertos do Banco Central.
+#
+# Existe porque a premissa oposta custou caro: o projeto assumia que o SGS não
+# tinha metadados consultáveis, e por isso os códigos do fluxo cambial foram
+# escolhidos por palpite. Vieram outra série, e o erro só apareceu depois de
+# meses de dados coletados.
+#
+# Fluxo recomendado: buscar aqui o código, e confirmar o que ele devolve com o
+# workflow 'Sondar séries do SGS' antes de colocá-lo em config/sources.yaml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      termo:
+        description: 'Texto a procurar (ex.: fluxo cambial)'
+        required: true
+        type: string
+      limite:
+        description: "Máximo de resultados"
+        required: false
+        default: "50"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Buscar no catálogo
+        run: |
+          tesouraria sgs-buscar "${{ inputs.termo }}" --limite ${{ inputs.limite }}

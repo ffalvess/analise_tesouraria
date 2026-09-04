@@ -99,6 +99,11 @@ sources:
   bcb_sgs:
     descricao: "Sistema Gerenciador de Séries Temporais do Banco Central"
     url_template: "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados"
+    # Catálogo pesquisável das séries (CKAN do portal de dados abertos). É o que
+    # transforma "achar o código" de varredura numérica em consulta por nome —
+    # ver `tesouraria sgs-buscar`. A nota antiga de que o SGS não tem metadados
+    # era falsa, e foi ela que levou a chutar os códigos do fluxo cambial.
+    catalogo_url: "https://dadosabertos.bcb.gov.br/api/3/action/package_search"
     fixture: "bcb_sgs.json"
     # A API do SGS limita janelas longas; a ingestão fatia por blocos de anos.
     anos_por_requisicao: 10
