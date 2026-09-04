@@ -77,12 +77,20 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # A main pode ter andado enquanto a coleta rodava — um push de código,
+          # outra execução. Com o `git push` seco, o push é recusado e os dados
+          # desta execução se perdem em silêncio: o passo seguinte é o único que
+          # falha, e por outro motivo. Reancorar em origin/main antes de commitar
+          # elimina isso; o índice guarda os snapshots recém-exportados, e o
+          # commit nasce por cima do que já está publicado.
+          git fetch origin main
+          git reset --soft origin/main
           git add data/snapshots
           if git diff --staged --quiet; then
             echo "Nenhuma mudança nos dados; nada a commitar."
           else
             git commit -m "Atualiza dados: coleta de $(date -u +%Y-%m-%d)"
-            git push
+            git push origin HEAD:main
           fi
 
       - name: Verificar as fontes primárias

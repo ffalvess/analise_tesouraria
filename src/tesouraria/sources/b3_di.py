@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as dt
 import io
 import logging
+import re
 
 import pandas as pd
 
@@ -24,6 +25,22 @@ from tesouraria.sources.base import Source, business_days
 logger = logging.getLogger(__name__)
 
 VALOR_FACE = 100_000.0
+
+
+def _amostra(texto: str, limite: int = 300) -> str:
+    """Título e começo do conteúdo, para o log dizer o que a B3 devolveu."""
+    if not texto.strip():
+        return "resposta vazia"
+
+    titulo = re.search(r"<title[^>]*>(.*?)</title>", texto, re.IGNORECASE | re.DOTALL)
+    visivel = re.sub(r"<[^>]+>", " ", texto)
+    visivel = " ".join(visivel.split())[:limite]
+
+    partes = [f"{len(texto)} caracteres"]
+    if titulo:
+        partes.append(f"título {titulo.group(1).strip()!r}")
+    partes.append(f"texto {visivel!r}" if visivel else "sem texto visível")
+    return "; ".join(partes)
 
 
 class B3DiSource(Source):
@@ -64,7 +81,14 @@ class B3DiSource(Source):
         texto = raw.decode(self.config.get("encoding", "latin-1"), errors="replace")
         # flavor explicito: o padrao do pandas cai em bs4+html5lib, que pode nao
         # existir num ambiente limpo. lxml ja e dependencia declarada.
-        tabelas = pd.read_html(io.StringIO(texto), decimal=",", thousands=".", flavor="lxml")
+        try:
+            tabelas = pd.read_html(io.StringIO(texto), decimal=",", thousands=".", flavor="lxml")
+        except Exception as exc:  # noqa: BLE001 — lxml também levanta XMLSyntaxError
+            # `No tables found` diz que a página não é o boletim, e nada sobre o
+            # que ela é: aviso de manutenção, redirecionamento para login, casca
+            # de JavaScript. Sem a amostra, a correção vira tentativa e erro num
+            # host que só responde de dentro do workflow.
+            raise ValueError(f"{exc} — recebido: {_amostra(texto)}") from exc
 
         df = self._tabela_de_ajustes(tabelas)
         if df is None:

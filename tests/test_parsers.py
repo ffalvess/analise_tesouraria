@@ -351,3 +351,31 @@ def test_documentos_recebem_id_estavel():
 
     assert doc_id("https://a.invalido/x") == doc_id("https://a.invalido/x")
     assert doc_id("https://a.invalido/x") != doc_id("https://a.invalido/y")
+
+
+def test_b3_sem_tabela_descreve_o_que_veio():
+    """`No tables found` sozinho não diz se é manutenção, login ou JavaScript.
+
+    A B3 só responde de dentro do workflow, então a mensagem do log é a única
+    evidência disponível para a próxima correção.
+    """
+    from tesouraria.sources.b3_di import B3DiSource
+
+    pagina = (
+        "<html><head><title>Sistema indisponível</title></head>"
+        "<body><p>Estamos em manutenção. Tente mais tarde.</p></body></html>"
+    ).encode("latin-1")
+
+    with pytest.raises(ValueError) as erro:
+        B3DiSource().parse(pagina, data_ref=dt.date(2026, 8, 28))
+
+    mensagem = str(erro.value)
+    assert "Sistema indisponível" in mensagem
+    assert "manutenção" in mensagem
+
+
+def test_b3_sem_tabela_e_resposta_vazia():
+    from tesouraria.sources.b3_di import B3DiSource
+
+    with pytest.raises(ValueError, match="resposta vazia"):
+        B3DiSource().parse(b"   ", data_ref=dt.date(2026, 8, 28))
