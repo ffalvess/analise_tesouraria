@@ -312,17 +312,27 @@ def comando_sgs_buscar(args: argparse.Namespace) -> int:
 
     print(f"{'código':>8}  título")
     print("-" * 100)
-    achados = 0
+    com_codigo = 0
     for conjunto in conjuntos:
-        codigo = extrair_codigo(conjunto.get("name", ""))
-        if codigo is None:
-            continue
+        nome = conjunto.get("name", "")
+        codigo = extrair_codigo(nome)
         titulo = (conjunto.get("title") or conjunto.get("notes") or "").strip()
-        print(f"{codigo:>8}  {titulo[:90]}")
-        achados += 1
 
-    total = (resposta or {}).get("result", {}).get("count", achados)
-    print(f"\n{achados} séries exibidas de {total} encontradas para {args.termo!r}.")
+        if codigo is None:
+            # Conjunto sem código no identificador ainda é resultado: pode ser o
+            # agregado que aponta para as séries certas. Descartar em silêncio
+            # já produziu um "1 encontrada, 0 exibidas" que não explicava nada.
+            print(f"{'—':>8}  {titulo[:70]}  [{nome[:40]}]")
+            continue
+
+        print(f"{codigo:>8}  {titulo[:90]}")
+        com_codigo += 1
+
+    total = (resposta or {}).get("result", {}).get("count", len(conjuntos))
+    print(
+        f"\n{len(conjuntos)} conjuntos exibidos de {total} encontrados para "
+        f"{args.termo!r} ({com_codigo} com código de série)."
+    )
     print("Confirme o conteúdo com: tesouraria sgs-probe --de CÓDIGO --ate CÓDIGO")
     return 0
 
