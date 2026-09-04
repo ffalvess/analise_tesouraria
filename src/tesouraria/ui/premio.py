@@ -51,11 +51,17 @@ def cestas_disponiveis() -> tuple[dict[str, str], bool]:
     A flag existe para a tela poder dizer o que está medindo: um prêmio contra a
     cesta ampla é uma leitura diferente de um prêmio contra as cestas que
     excluem o real, e apresentar os dois do mesmo jeito seria enganoso.
+
+    "Não vazia" seria critério fraco demais para uma série virar régua. Uma
+    coleta parcial — sete dias de `DTWEXAFEGS`, digamos — bastaria para
+    desbancar uma reserva com onze anos de histórico, e a tela perderia em
+    silêncio o prêmio acumulado e o beta móvel, que precisam de
+    `currency.JANELA_BETA` pregões. Continuaria parecendo certa, medindo menos.
     """
     preferidas = {
         serie_id: rotulo
         for serie_id, rotulo in CESTAS.items()
-        if not common.cache_serie(serie_id).empty
+        if len(common.cache_serie(serie_id)) >= currency.JANELA_BETA
     }
     if preferidas:
         return preferidas, False
@@ -63,9 +69,23 @@ def cestas_disponiveis() -> tuple[dict[str, str], bool]:
     reserva = {
         serie_id: rotulo
         for serie_id, rotulo in CESTA_RESERVA.items()
+        if len(common.cache_serie(serie_id)) >= currency.JANELA_BETA
+    }
+    if reserva:
+        return reserva, True
+
+    # Nenhuma cesta com histórico para o beta: sobra o que houver. Meia leitura
+    # ainda responde "o dólar subiu contra todo mundo?", e os blocos que exigem
+    # o ano de pregões já se explicam sozinhos quando não têm dados.
+    curtas = {
+        serie_id: rotulo
+        for serie_id, rotulo in {**CESTAS, **CESTA_RESERVA}.items()
         if not common.cache_serie(serie_id).empty
     }
-    return reserva, bool(reserva)
+    preferidas_curtas = {s: r for s, r in curtas.items() if s in CESTAS}
+    if preferidas_curtas:
+        return preferidas_curtas, False
+    return curtas, bool(curtas)
 
 
 def _bases(cambio: pd.DataFrame, cestas: dict[str, str]) -> dict[str, pd.DataFrame]:

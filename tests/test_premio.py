@@ -32,11 +32,13 @@ def serie(serie_id: str, n: int = 5) -> pd.DataFrame:
 def banco_de_series(monkeypatch):
     """Substitui a consulta por um banco declarado no próprio teste."""
 
-    def montar(*presentes: str) -> None:
+    def montar(*presentes: str, n: int = 300) -> None:
+        """`n` acima da janela do beta: aqui o assunto é *qual* cesta, não se há
+        histórico — isso tem os seus próprios testes logo abaixo."""
         monkeypatch.setattr(
             premio.common,
             "cache_serie",
-            lambda sid, desde=None: serie(sid) if sid in presentes else pd.DataFrame(),
+            lambda sid, desde=None: serie(sid, n) if sid in presentes else pd.DataFrame(),
         )
 
     return montar
@@ -90,6 +92,54 @@ def test_premio_do_dia_sem_cesta_e_nan(banco_de_series):
 
     banco_de_series()
     assert np.isnan(premio.premio_do_dia(serie("1", n=40)))
+
+
+def test_cesta_preferida_curta_nao_desbanca_a_reserva_longa(monkeypatch):
+    """A armadilha da coleta parcial.
+
+    Uma coleta de sete dias deixaria a `DTWEXAFEGS` com um punhado de
+    observações. Sem esta guarda ela viraria régua na hora, e a tela trocaria um
+    prêmio com onze anos de histórico e beta móvel por uma leitura de um dia —
+    sem erro nenhum, sem aviso nenhum, parecendo igualmente certa.
+    """
+    tamanhos = {"DTWEXAFEGS": 7, "DTWEXBGS": 3000}
+    monkeypatch.setattr(
+        premio.common,
+        "cache_serie",
+        lambda sid, desde=None: serie(sid, tamanhos[sid]) if sid in tamanhos else pd.DataFrame(),
+    )
+
+    cestas, reserva = premio.cestas_disponiveis()
+    assert set(cestas) == {"DTWEXBGS"}
+    assert reserva
+
+
+def test_cesta_preferida_com_historico_assume(monkeypatch):
+    from tesouraria.analytics import currency
+
+    tamanhos = {"DTWEXAFEGS": currency.JANELA_BETA, "DTWEXBGS": 3000}
+    monkeypatch.setattr(
+        premio.common,
+        "cache_serie",
+        lambda sid, desde=None: serie(sid, tamanhos[sid]) if sid in tamanhos else pd.DataFrame(),
+    )
+
+    cestas, reserva = premio.cestas_disponiveis()
+    assert set(cestas) == {"DTWEXAFEGS"}
+    assert not reserva
+
+
+def test_so_uma_cesta_curta_ainda_e_melhor_que_nada(monkeypatch):
+    """Sem nenhuma série longa, meia leitura vale mais que a tela vazia."""
+    monkeypatch.setattr(
+        premio.common,
+        "cache_serie",
+        lambda sid, desde=None: serie(sid, 7) if sid == "DTWEXAFEGS" else pd.DataFrame(),
+    )
+
+    cestas, reserva = premio.cestas_disponiveis()
+    assert set(cestas) == {"DTWEXAFEGS"}
+    assert not reserva, "a preferida curta não é a cesta ampla; a ressalva não se aplica"
 
 
 def test_a_ressalva_diz_por_que_o_numero_e_amortecido():
