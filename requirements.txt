@@ -25,6 +25,11 @@ lxml==6.1.2
 # Parser de reserva do pandas.read_html: sem ele, a leitura do boletim da B3
 # falha num ambiente limpo, onde nao vem como dependencia transitiva.
 html5lib==1.1
+# Leitores de planilha. O Banco Central publica o fluxo cambial em Excel, e o
+# pandas nao traz leitor nenhum por padrao: openpyxl le .xlsx, xlrd le o .xls
+# antigo, que e o formato das tabelas do setor externo.
+openpyxl==3.1.5
+xlrd==2.0.2
 python-dateutil==2.9.0.post0
 
 # Instala o próprio pacote `tesouraria` a partir do pyproject.toml.

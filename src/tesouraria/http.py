@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -182,3 +183,37 @@ def fetch_text(url: str, *, encoding: str = "utf-8", **kwargs: Any) -> str:
 
 def fetch_json(url: str, **kwargs: Any) -> Any:
     return json.loads(fetch(url, **kwargs).decode("utf-8", errors="replace"))
+
+
+@dataclass(frozen=True)
+class Resposta:
+    """O que uma URL devolveu, para diagnóstico — não para ingestão."""
+
+    status: int
+    content_type: str
+    conteudo: bytes
+
+
+def inspecionar(url: str, *, timeout: float = 30.0) -> Resposta:
+    """Busca uma URL preservando status e cabeçalhos, sem cache e sem retry.
+
+    Deliberadamente fora do caminho de `fetch`: uma inspeção quer ver a
+    resposta **como ela é**, inclusive quando é um 404 ou uma página de erro
+    com status 200 — que foi o caso da B3. Cache mascararia uma correção
+    recém-publicada, e retry só faria esperar mais pelo mesmo diagnóstico.
+
+    Um status de erro não levanta: ele é o resultado da inspeção.
+    """
+    settings = get_settings()
+    if settings.offline:
+        raise OfflineError(f"modo offline ativo; requisição a {url} não executada")
+
+    logger.info("GET %s", url)
+    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+        resposta = client.get(url, headers={"User-Agent": settings.user_agent})
+
+    return Resposta(
+        status=resposta.status_code,
+        content_type=resposta.headers.get("content-type", ""),
+        conteudo=resposta.content,
+    )

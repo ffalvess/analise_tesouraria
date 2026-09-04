@@ -98,6 +98,18 @@ def construir_parser() -> argparse.ArgumentParser:
     busca.add_argument("termo", help='texto a procurar, ex.: "fluxo cambial"')
     busca.add_argument("--limite", type=int, default=50, help="resultados (padrão: 50)")
 
+    espiar = sub.add_parser(
+        "espiar",
+        help="descreve o que uma URL devolveu (abas de planilha, links, cabeçalhos)",
+    )
+    espiar.add_argument("url", help="endereço a inspecionar")
+    espiar.add_argument(
+        "--filtro",
+        default=None,
+        help="numa página HTML, só lista os links que contenham este texto",
+    )
+    espiar.add_argument("--timeout", type=float, default=60.0, help="segundos (padrão: 60)")
+
     serve = sub.add_parser("serve", help="abre a interface Streamlit")
     serve.add_argument("--port", type=int, default=8501)
     serve.add_argument("--offline", action="store_true", help="roda a interface em modo offline")
@@ -337,6 +349,32 @@ def comando_sgs_buscar(args: argparse.Namespace) -> int:
     return 0
 
 
+def comando_espiar(args: argparse.Namespace) -> int:
+    """Mostra o que uma URL devolveu, antes de escrever qualquer parser.
+
+    Os hosts financeiros só respondem de dentro do workflow, então escrever uma
+    fonte contra uma estrutura suposta é o modo caro de descobrir que ela é
+    outra. Este comando troca a suposição por evidência: uma execução, e o log
+    diz quais são as abas da planilha, quais links a página oferece, ou que a
+    resposta é uma página de erro com status 200.
+    """
+    from tesouraria import inspecao
+    from tesouraria.http import inspecionar
+
+    resposta = inspecionar(args.url, timeout=args.timeout)
+    print(f"status ....... {resposta.status}")
+    for linha in inspecao.descrever(
+        resposta.conteudo,
+        url=args.url,
+        content_type=resposta.content_type,
+        filtro=args.filtro,
+    ):
+        print(linha)
+    # Status de erro não é falha do comando: descrever a página de erro é
+    # exatamente o serviço prestado aqui.
+    return 0
+
+
 def comando_serve(args: argparse.Namespace) -> int:
     if args.offline:
         os.environ["TESOURARIA_OFFLINE"] = "1"
@@ -362,6 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         "snapshot": comando_snapshot,
         "sgs-probe": comando_sgs_probe,
         "sgs-buscar": comando_sgs_buscar,
+        "espiar": comando_espiar,
         "serve": comando_serve,
     }
     return comandos[args.comando](args)
