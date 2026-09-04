@@ -8,6 +8,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -81,6 +82,12 @@ def construir_parser() -> argparse.ArgumentParser:
     sonda.add_argument("--ate", type=int, required=True, help="último código da faixa")
     sonda.add_argument(
         "--amostra", type=int, default=24, help="observações a buscar por série (padrão: 24)"
+    )
+    sonda.add_argument(
+        "--timeout",
+        type=float,
+        default=8.0,
+        help="segundos por código antes de desistir (padrão: 8; o SGS pendura em código inexistente)",
     )
 
     serve = sub.add_parser("serve", help="abre a interface Streamlit")
@@ -201,12 +208,29 @@ def comando_sgs_probe(args: argparse.Namespace) -> int:
     print("-" * 105)
 
     encontrados = 0
-    for codigo in range(args.de, args.ate + 1):
+    total = args.ate - args.de + 1
+    inicio = time.monotonic()
+
+    for posicao, codigo in enumerate(range(args.de, args.ate + 1), start=1):
+        # Progresso a cada 25 códigos: sem isto, uma varredura interrompida não
+        # deixa registro de onde parou, e o log fica indistinguível de travado.
+        if posicao % 25 == 0:
+            decorrido = time.monotonic() - inicio
+            restante = decorrido / posicao * (total - posicao)
+            print(
+                f"... {posicao}/{total} códigos ({encontrados} com dados) · "
+                f"{decorrido / 60:.1f} min decorridos, ~{restante / 60:.1f} min restantes",
+                flush=True,
+            )
         try:
             bruto = fetch(
                 modelo.format(codigo=codigo) + f"/ultimos/{args.amostra}",
                 params={"formato": "json"},
                 use_cache=False,
+                # Numa varredura, silêncio é resposta: o código não existe.
+                # Insistir com a política de coleta custava 2min18s por código.
+                timeout=args.timeout,
+                tentativas=1,
             )
             dados = parse_sgs(json.loads(bruto.decode("utf-8")), str(codigo))
         except Exception as exc:  # noqa: BLE001 — faixa varrida; a maioria não existe

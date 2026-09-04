@@ -123,11 +123,19 @@ def fetch(
     headers: dict[str, str] | None = None,
     use_cache: bool = True,
     ttl_hours: float | None = None,
+    timeout: float | None = None,
+    tentativas: int | None = None,
 ) -> bytes:
     """Busca uma URL e devolve o corpo em bytes.
 
     Em modo offline levanta `OfflineError` — cabe à fonte capturar e recorrer
     à sua fixture.
+
+    `timeout` e `tentativas` existem para quem **varre** em vez de coletar. A
+    política padrão — 30s, quatro tentativas — é a certa para uma série que
+    precisa entrar no banco, e desastrosa para uma sondagem: o SGS pendura a
+    conexão em código inexistente, e cada código passa a custar dois minutos e
+    meio. A varredura de 201 códigos levaria quase oito horas.
     """
     settings = get_settings()
     if settings.offline:
@@ -148,13 +156,18 @@ def fetch(
             return cached
 
     logger.info("GET %s", url)
-    content = _request(
+    executor = (
+        _request
+        if tentativas is None
+        else _request.retry_with(stop=stop_after_attempt(tentativas))
+    )
+    content = executor(
         method,
         url,
         params=params,
         data=data,
         headers=request_headers,
-        timeout=settings.http_timeout,
+        timeout=settings.http_timeout if timeout is None else timeout,
     )
 
     if use_cache:

@@ -31,6 +31,11 @@ on:
         required: false
         default: "24"
         type: string
+      timeout:
+        description: "Segundos por código antes de desistir"
+        required: false
+        default: "8"
+        type: string
 
 permissions:
   contents: read
@@ -59,4 +64,5 @@ jobs:
           tesouraria sgs-probe \
             --de ${{ inputs.de }} \
             --ate ${{ inputs.ate }} \
-            --amostra ${{ inputs.amostra }}
+            --amostra ${{ inputs.amostra }} \
+            --timeout ${{ inputs.timeout }}
