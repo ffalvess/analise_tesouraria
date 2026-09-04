@@ -102,7 +102,11 @@ def construir_parser() -> argparse.ArgumentParser:
         "espiar",
         help="descreve o que uma URL devolveu (abas de planilha, links, cabeçalhos)",
     )
-    espiar.add_argument("url", help="endereço a inspecionar")
+    espiar.add_argument(
+        "url",
+        nargs="+",
+        help="um ou mais endereços; varios de uma vez economizam rodadas de workflow",
+    )
     espiar.add_argument(
         "--filtro",
         default=None,
@@ -361,15 +365,27 @@ def comando_espiar(args: argparse.Namespace) -> int:
     from tesouraria import inspecao
     from tesouraria.http import inspecionar
 
-    resposta = inspecionar(args.url, timeout=args.timeout)
-    print(f"status ....... {resposta.status}")
-    for linha in inspecao.descrever(
-        resposta.conteudo,
-        url=args.url,
-        content_type=resposta.content_type,
-        filtro=args.filtro,
-    ):
-        print(linha)
+    # Varios enderecos por execucao porque o gargalo nao e a requisicao, e o
+    # ciclo: cada rodada de workflow custa cerca de um minuto de espera, e
+    # descobrir um nome de arquivo costuma exigir testar meia duzia de grafias.
+    for indice, url in enumerate(args.url):
+        if indice:
+            print("\n" + "=" * 78 + "\n")
+        try:
+            resposta = inspecionar(url, timeout=args.timeout)
+        except Exception as exc:  # noqa: BLE001 — uma URL ruim nao aborta as outras
+            print(f"url .......... {url}")
+            print(f"falhou ....... {type(exc).__name__}: {exc}")
+            continue
+
+        print(f"status ....... {resposta.status}")
+        for linha in inspecao.descrever(
+            resposta.conteudo,
+            url=url,
+            content_type=resposta.content_type,
+            filtro=args.filtro,
+        ):
+            print(linha)
     # Status de erro não é falha do comando: descrever a página de erro é
     # exatamente o serviço prestado aqui.
     return 0

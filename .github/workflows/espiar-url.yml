@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: "Endereço a inspecionar"
+        description: "Endereço(s) a inspecionar, separados por espaço"
         required: true
         type: string
       filtro:
@@ -50,8 +50,10 @@ jobs:
 
       - name: Espiar
         run: |
+          # Sem aspas em volta de inputs.url: a divisao por espaco e o que
+          # permite testar varios candidatos numa execucao so.
           if [ -n "${{ inputs.filtro }}" ]; then
-            tesouraria espiar "${{ inputs.url }}" --filtro "${{ inputs.filtro }}"
+            tesouraria espiar ${{ inputs.url }} --filtro "${{ inputs.filtro }}"
           else
-            tesouraria espiar "${{ inputs.url }}"
+            tesouraria espiar ${{ inputs.url }}
           fi
