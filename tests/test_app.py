@@ -47,6 +47,25 @@ def test_pagina_renderiza_sem_excecao(pagina, ambiente_ingerido):
     )
 
 
+def test_swap_usa_as_curvas_ingeridas(ambiente_ingerido):
+    """A tela do swap também roda com os dados do banco, e não só com o exemplo.
+
+    O caminho padrão abre com o exemplo publicado, que não toca no DuckDB.
+    Este teste troca a origem para os dados ingeridos, que é onde a curva DAP,
+    o número-índice do IPCA e a projeção mensal do Focus são de fato lidos.
+    """
+    pagina = UI / "pages" / "10_Swap_IPCA_x_CDI.py"
+    app = AppTest.from_file(str(pagina), default_timeout=TEMPO_LIMITE)
+    app.run()
+    app.radio(key="origem_dados").set_value("banco").run()
+
+    assert not app.exception, " | ".join(str(e.message) for e in app.exception)
+    # Sem vértices de DAP a tela para com um aviso; chegar às métricas do MtM
+    # prova que a curva de cupom de IPCA foi ingerida e interpolada.
+    assert any("MtM" in str(m.label) for m in app.metric)
+    assert not app.error
+
+
 def test_todas_as_paginas_estao_cobertas():
     """Uma página nova entra no teste sozinha; esta asserção garante que não passou despercebida."""
     assert len(PAGINAS) == 11

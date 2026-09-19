@@ -44,11 +44,15 @@ sources:
     max_dias_por_execucao: 30
 
   b3_di:
-    descricao: "Ajustes do futuro de DI de um dia (DI1) — curva pré negociada"
+    descricao: "Ajustes dos futuros de DI (DI1) e de cupom de IPCA (DAP) — curvas negociadas"
     url: "https://www2.bmf.com.br/pages/portal/bmfbovespa/boletim1/SistemaPregao_excel1.asp"
-    params:
-      Mercadoria: "DI1"
-    fixture: "b3_di.html"
+    # Um boletim por mercadoria e por pregão. `vencimento` é a regra de cada
+    # contrato: o DI1 vence no primeiro dia útil do mês de referência, o DAP no
+    # dia 15 — e o dia 15 cai em fim de semana com alguma frequência, o que só
+    # o calendário de feriados resolve.
+    mercadorias:
+      - { codigo: "DI1", tipo: pre, vencimento: primeiro_dia_util, fixture: "b3_di.html" }
+      - { codigo: "DAP", tipo: dap, vencimento: dia_15,            fixture: "b3_dap.html" }
     encoding: "latin-1"
     verificar: true
     # Mesma limitação da ANBIMA: um boletim por pregão, baixado dia a dia.
@@ -174,10 +178,22 @@ sources:
     fixtures:
       geral: "focus_geral.json"
       top5: "focus_top5.json"
+      mensal: "focus_mensal.json"
     endpoints:
       geral: "ExpectativasMercadoAnuais"
       top5: "ExpectativasMercadoTop5Anuais"
+      # Competência mensal do IPCA. É o que alimenta o rateio *pro rata* do
+      # índice entre dois aniversários (`analytics/swap.py::corrigir_indice`).
+      # A convenção de mesa para esse rateio é a projeção da ANBIMA, que não
+      # tem API aberta; o Focus mensal é a melhor aproximação pública, e a
+      # tela avisa qual das duas está em uso.
+      mensal: "ExpectativasMercadoMensais"
     indicadores: ["IPCA", "Selic", "Câmbio", "PIB Total"]
+    # Restrições por endpoint: no mensal só o IPCA interessa, e o volume de
+    # todos os indicadores em competência mensal é grande o bastante para
+    # fazer diferença no tempo de coleta.
+    indicadores_por_endpoint:
+      mensal: ["IPCA"]
     pagina: 10000
 
   # -------------------------------------------------------- comércio externo
@@ -198,6 +214,10 @@ sources:
     series:
       - { tabela: 1737, variavel: 63,   nome: "IPCA variação mensal",    unidade: "%", faixa: [-3, 5] }
       - { tabela: 1737, variavel: 2265, nome: "IPCA acumulado 12 meses", unidade: "%", faixa: [-5, 40] }
+      # Número-índice: é o que corrige o VNA de uma NTN-B e a ponta IPCA de um
+      # swap. A variação mensal não substitui — a correção de um contrato é a
+      # razão entre dois índices, e reconstruí-la por produtório acumula erro.
+      - { tabela: 1737, variavel: 2266, nome: "IPCA número-índice",      unidade: "índice", faixa: [100, 50000] }
       - { tabela: 6381, variavel: 4099, nome: "Taxa de desocupação",     unidade: "%", faixa: [2, 30] }
     # Removidas: 5932-6564 (PIB) e 8880-7169 (PMC) devolveram só NaN na coleta
     # real — a combinação tabela/variável existe, mas não traz valor. Confirme

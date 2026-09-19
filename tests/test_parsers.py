@@ -244,6 +244,57 @@ def test_b3_codigo_de_vencimento():
     assert fonte._vencimento("XX", dt.date(2026, 8, 28)) is None
 
 
+def test_b3_vencimento_respeita_feriado_e_nao_so_o_fim_de_semana():
+    """1º de janeiro é feriado numa quinta-feira: o DI1 vence no dia 2."""
+    fonte = B3DiSource()
+    assert fonte._vencimento("F26", dt.date(2025, 8, 28)) == dt.date(2026, 1, 2)
+
+
+def test_b3_vencimento_do_dap_e_no_dia_15():
+    """Os três vencimentos conferidos contra o exemplo de swap em test_swap.py."""
+    fonte = B3DiSource()
+    data_ref = dt.date(2026, 9, 18)
+    assert fonte._vencimento("X26", data_ref, "dia_15") == dt.date(2026, 11, 16)  # 15/11 é domingo
+    assert fonte._vencimento("Z26", data_ref, "dia_15") == dt.date(2026, 12, 15)
+    assert fonte._vencimento("F27", data_ref, "dia_15") == dt.date(2027, 1, 15)
+
+
+def test_b3_mercadorias_configuradas():
+    """A fonte coleta DI1 e DAP, cada um com sua regra de vencimento."""
+    mercadorias = {m["codigo"]: m for m in B3DiSource().mercadorias()}
+    assert mercadorias["DI1"]["tipo"] == "pre"
+    assert mercadorias["DAP"]["tipo"] == "dap"
+    assert mercadorias["DAP"]["vencimento"] == "dia_15"
+
+
+def test_b3_dap(fixtures_dir):
+    data_ref = dt.date(2026, 8, 28)
+    fonte = B3DiSource()
+    dap = next(m for m in fonte.mercadorias() if m["codigo"] == "DAP")
+    df = fonte.parse(ler(fixtures_dir, "b3_dap.html"), data_ref=data_ref, mercadoria=dap)
+
+    assert not df.empty
+    assert (df["tipo"] == "dap").all()
+    assert df["instrumento"].str.startswith("DAP").all()
+    # Cupom de IPCA: juro real, uma ordem de grandeza abaixo do nominal.
+    assert df["taxa"].between(1, 15).all()
+    # Todo vencimento de DAP é dia 15 ou o pregão seguinte.
+    assert (pd.to_datetime(df["vencimento"]).dt.day >= 15).all()
+
+
+def test_b3_dap_e_di1_convivem_no_mesmo_dia(fixtures_dir):
+    """As duas curvas do mesmo pregão diferem: a razão entre elas é a implícita."""
+    data_ref = dt.date(2026, 8, 28)
+    fonte = B3DiSource()
+    pre = fonte.parse(ler(fixtures_dir, "b3_di.html"), data_ref=data_ref)
+    dap = fonte.parse(
+        ler(fixtures_dir, "b3_dap.html"),
+        data_ref=data_ref,
+        mercadoria=next(m for m in fonte.mercadorias() if m["codigo"] == "DAP"),
+    )
+    assert pre["taxa"].mean() > dap["taxa"].mean()
+
+
 # -------------------------------------------------------------------- SIDRA
 
 

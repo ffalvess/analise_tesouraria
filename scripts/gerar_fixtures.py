@@ -15,6 +15,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from tesouraria.analytics import calendario as cal
+
 RAIZ = Path(__file__).resolve().parents[1]
 DESTINO = RAIZ / "data" / "fixtures"
 DESTINO.mkdir(parents=True, exist_ok=True)
@@ -189,7 +191,9 @@ for ano in range(base.year, base.year + 11):
         venc = pd.Timestamp(year=ano, month=mes, day=1)
         if venc <= base:
             continue
-        du = max(int((venc - base).days / 365.25 * 252), 1)
+        # Mesma contagem que o parser usa ao converter PU em taxa: com a
+        # aproximação antiga, a taxa lida de volta não era a taxa gerada.
+        du = max(cal.dias_uteis(base.date(), cal.proximo_dia_util(venc.date())), 1)
         prazo = du / 252
         taxa = taxa_pre(prazo, ultimo)
         pu = 100_000 / (1 + taxa / 100) ** (du / 252)
@@ -213,6 +217,46 @@ html = f"""<html><head><meta charset="iso-8859-1"></head><body>
 </body></html>"""
 (DESTINO / "b3_di.html").write_bytes(html.encode("latin-1", errors="replace"))
 print(f"b3_di.html: {len(tabela_b3)} contratos")
+
+
+# O DAP vence no dia 15 e é cotado pelo cupom de IPCA — a taxa real. A amostra
+# traz todos os meses para que a interpolação tenha vértices em qualquer data;
+# na B3 a liquidez se concentra em alguns vencimentos, mas a forma do arquivo
+# é a mesma.
+CODIGOS_MES_DAP = {
+    1: "F", 2: "G", 3: "H", 4: "J", 5: "K", 6: "M",
+    7: "N", 8: "Q", 9: "U", 10: "V", 11: "X", 12: "Z",
+}
+
+contratos_dap = []
+for ano in range(base.year, base.year + 11):
+    for mes, codigo in CODIGOS_MES_DAP.items():
+        venc = cal.proximo_dia_util(dt.date(ano, mes, 15))
+        if venc <= base.date():
+            continue
+        du = max(cal.dias_uteis(base.date(), venc), 1)
+        taxa = taxa_ipca(du / 252, ultimo)
+        pu = 100_000 / (1 + taxa / 100) ** (du / 252)
+        contratos_dap.append(
+            {
+                "VENCTO": f"{codigo}{str(ano)[2:]}",
+                "CONTR. ABERT.(1)": 24_000,
+                "CONTR. FECH.(2)": 23_400,
+                "PREÇO MÉD.": round(pu, 2),
+                "ÚLT. PREÇO": round(pu, 2),
+                "AJUSTE": round(pu, 2),
+                "VAR. PTOS.": 8.0,
+            }
+        )
+
+tabela_dap = pd.DataFrame(contratos_dap)
+html_dap = f"""<html><head><meta charset="iso-8859-1"></head><body>
+<h3>BM&amp;FBOVESPA - Mercadoria: DAP - {base.strftime('%d/%m/%Y')}</h3>
+<p>AMOSTRA SINTETICA PARA DESENVOLVIMENTO - NAO SAO AJUSTES REAIS</p>
+{tabela_dap.to_html(index=False, decimal=',')}
+</body></html>"""
+(DESTINO / "b3_dap.html").write_bytes(html_dap.encode("latin-1", errors="replace"))
+print(f"b3_dap.html: {len(tabela_dap)} contratos")
 
 
 # ================================================================= BCB SGS
@@ -322,6 +366,33 @@ for registro in registros_focus[::3]:
 (DESTINO / "focus_top5.json").write_text(json.dumps({"value": top5}), encoding="utf-8")
 print(f"focus: {len(registros_focus)} geral / {len(top5)} top5")
 
+# Competência mensal do IPCA: é a projeção do mês corrente que entra no rateio
+# pro rata do número-índice. Gerador próprio para não deslocar a sequência de
+# sorteios das amostras anteriores.
+rng_mensal = np.random.default_rng(20260829)
+registros_mensais = []
+for data in coletas:
+    for adiante in range(12):
+        competencia = (data + pd.DateOffset(months=adiante)).strftime("%m/%Y")
+        mediana = round(float(rng_mensal.normal(0.38, 0.14)), 4)
+        registros_mensais.append(
+            {
+                "Indicador": "IPCA",
+                "Data": data.strftime("%Y-%m-%d"),
+                "DataReferencia": competencia,
+                "Media": round(mediana + 0.01, 4),
+                "Mediana": mediana,
+                "DesvioPadrao": round(abs(float(rng_mensal.normal(0.09, 0.02))), 4),
+                "Minimo": round(mediana - 0.25, 4),
+                "Maximo": round(mediana + 0.25, 4),
+                "numeroRespondentes": int(rng_mensal.integers(40, 95)),
+            }
+        )
+(DESTINO / "focus_mensal.json").write_text(
+    json.dumps({"value": registros_mensais}), encoding="utf-8"
+)
+print(f"focus_mensal.json: {len(registros_mensais)} projeções mensais")
+
 
 # ================================================================ Comex Stat
 comex = {}
@@ -368,8 +439,15 @@ codigos_mes = [m.strftime("%Y%m") for m in meses]
 trimestres = [m.strftime("%Y%m") for m in meses]
 anos = [str(a) for a in range(2015, 2027)]
 
+# O número-índice é construído a partir da própria variação mensal da amostra,
+# e não sorteado à parte: no arquivo real um é o acumulado do outro, e uma
+# amostra em que os dois se contradizem esconderia erro de quem os cruza.
+variacao_mensal = rng.normal(0.38, 0.18, len(meses))
+numero_indice = 7000 * np.cumprod(1 + variacao_mensal / 100)
+
 sidra_payload = {
-    "1737-63": sidra("Mês", codigos_mes, rng.normal(0.38, 0.18, len(meses))),
+    "1737-63": sidra("Mês", codigos_mes, variacao_mensal),
+    "1737-2266": sidra("Mês", codigos_mes, numero_indice),
     "1737-2265": sidra("Mês", codigos_mes, passeio(4.4, 0.10, 0.02)[: len(meses)]),
     "6381-4099": sidra(
         "Trimestre Móvel", trimestres,

@@ -5,6 +5,11 @@ Top 5 — as cinco instituições mais assertivas. Ter as duas permite ver quand
 o consenso e os melhores previsores discordam, o que costuma anteceder
 revisão da curva.
 
+Coleta também a competência **mensal** do IPCA, que serve a outra finalidade:
+é a projeção do mês corrente usada para ratear a correção do índice entre dois
+aniversários, no cálculo de um VNA ou da ponta IPCA de um swap. As três
+variantes convivem na mesma tabela, separadas pela coluna `tipo`.
+
 A API expõe duas bases de cálculo (últimos 30 e últimos 5 dias úteis); apenas
 a de 30 dias é coletada, para que exista uma única leitura por data e
 indicador.
@@ -66,17 +71,18 @@ class FocusSource(Source):
         return pd.concat(quadros, ignore_index=True)
 
     def fixture_bundle(self) -> str:
-        """As duas variantes do Focus vivem num único arquivo de amostra."""
+        """Cada variante do Focus tem seu arquivo de amostra; aqui viram um pacote só."""
         nomes = self.config.get("fixtures", {})
         pacote = {tipo: json.loads(self.fixture(nome)) for tipo, nome in nomes.items()}
         return json.dumps(pacote)
 
     def _fetch(self, cfg: dict, endpoint: str, tipo: str, inicio: dt.date) -> list[dict]:
-        indicadores = " or ".join(f"Indicador eq '{i}'" for i in cfg["indicadores"])
+        alvos = cfg.get("indicadores_por_endpoint", {}).get(tipo, cfg["indicadores"])
+        indicadores = " or ".join(f"Indicador eq '{i}'" for i in alvos)
         filtro = f"Data ge '{inicio.isoformat()}' and ({indicadores})"
         # Base de cálculo 0 = últimos 30 dias úteis, a leitura padrão do Focus.
         # No Top 5, tipoCalculo 'C' é o ranking de curto prazo.
-        filtro += " and baseCalculo eq 0" if tipo == "geral" else " and tipoCalculo eq 'C'"
+        filtro += " and tipoCalculo eq 'C'" if tipo == "top5" else " and baseCalculo eq 0"
 
         pagina = int(cfg.get("pagina", 10000))
         valores: list[dict] = []

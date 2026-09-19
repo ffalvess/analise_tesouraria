@@ -1,14 +1,27 @@
-"""Curva prefixada a partir dos futuros de DI de um dia (DI1) da B3.
+"""Curvas negociadas na B3: futuro de DI de um dia (DI1) e de cupom de IPCA (DAP).
 
-É a curva que o mercado efetivamente negocia e a mais líquida do país — por
-isso costuma reagir antes da curva de títulos a discursos do Copom e a
+São as curvas que o mercado efetivamente negocia e as mais líquidas do país —
+por isso costumam reagir antes da curva de títulos a discursos do Copom e a
 surpresas de inflação.
 
-O boletim da B3 publica o preço de ajuste (PU) de cada vencimento. A taxa sai
-da relação entre o PU e o valor de face de 100.000, capitalizada em dias
-úteis:
+O boletim publica o preço de ajuste (PU) de cada vencimento, e os dois
+contratos têm a mesma mecânica: valor de face de 100.000 descontado pela taxa
+em dias úteis. A taxa sai da relação entre os dois:
 
     taxa = (100000 / PU) ** (252 / du) - 1
+
+O que muda de um para o outro é o **vencimento** — DI1 vence no primeiro dia
+útil do mês de referência, DAP no dia 15 (ou no dia útil seguinte) — e o que a
+taxa significa: o DI1 é juro nominal, o DAP é o cupom de IPCA. A razão entre os
+fatores acumulados das duas é a inflação implícita negociada, que é como o
+mercado precifica um swap CDI × IPCA (ver `analytics/swap.py`).
+
+O prazo aqui é contado pelo calendário de feriados (`analytics/calendario.py`),
+e não pela aproximação de `sources/base.py`: como a taxa é *derivada* do PU,
+um dia útil a mais ou a menos entraria direto no número gravado no banco.
+
+O nome da fonte continua `b3_di` por compatibilidade com o histórico de
+`ingest_log` e com os snapshots já versionados.
 """
 
 from __future__ import annotations
@@ -20,7 +33,8 @@ import re
 
 import pandas as pd
 
-from tesouraria.sources.base import Source, business_days
+from tesouraria.analytics import calendario as cal
+from tesouraria.sources.base import Source
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +66,27 @@ class B3DiSource(Source):
         quadros: list[pd.DataFrame] = []
         datas = self._datas(since)
         ultimo_erro: str | None = None
+        consultas = 0
 
         for data_ref in datas:
-            try:
-                raw = self.get(
-                    cfg["url"],
-                    fixture=cfg.get("fixture"),
-                    params={**cfg.get("params", {}), "Data": data_ref.strftime("%d/%m/%Y")},
-                )
-                quadros.append(self.parse(raw, data_ref=data_ref))
-            except Exception as exc:  # noqa: BLE001 — feriado e dia sem pregão são esperados
-                ultimo_erro = f"{type(exc).__name__}: {exc}"
-                logger.warning("B3 DI1 sem dados para %s: %s", data_ref, exc)
+            for mercadoria in self.mercadorias():
+                consultas += 1
+                try:
+                    raw = self.get(
+                        cfg["url"],
+                        fixture=mercadoria.get("fixture"),
+                        params={
+                            **cfg.get("params", {}),
+                            "Mercadoria": mercadoria["codigo"],
+                            "Data": data_ref.strftime("%d/%m/%Y"),
+                        },
+                    )
+                    quadros.append(self.parse(raw, data_ref=data_ref, mercadoria=mercadoria))
+                except Exception as exc:  # noqa: BLE001 — feriado e dia sem pregão são esperados
+                    ultimo_erro = f"{mercadoria['codigo']}/{data_ref}: {type(exc).__name__}: {exc}"
+                    logger.warning(
+                        "B3 %s sem dados para %s: %s", mercadoria["codigo"], data_ref, exc
+                    )
 
         quadros = [q for q in quadros if not q.empty]
         if not quadros:
@@ -72,12 +95,33 @@ class B3DiSource(Source):
             # duas apareciam como `vazio` no rodapé, e foi assim que a falta do
             # html5lib passou despercebida na primeira coleta real.
             raise RuntimeError(
-                f"nenhuma das {len(datas)} datas consultadas devolveu dados; "
-                f"último erro: {ultimo_erro}"
+                f"nenhuma das {consultas} consultas devolveu dados; último erro: {ultimo_erro}"
             )
         return pd.concat(quadros, ignore_index=True)
 
-    def parse(self, raw: bytes, data_ref: dt.date) -> pd.DataFrame:
+    def mercadorias(self) -> list[dict]:
+        """Contratos a coletar, do arquivo de configuração.
+
+        O fallback cobre uma configuração antiga, de quando a fonte só conhecia
+        o DI1: sem isso, um `sources.yaml` desatualizado deixaria de coletar em
+        silêncio, que é o modo de falhar que este projeto mais evita.
+        """
+        cfg = self.config
+        if cfg.get("mercadorias"):
+            return list(cfg["mercadorias"])
+        return [
+            {
+                "codigo": cfg.get("params", {}).get("Mercadoria", "DI1"),
+                "tipo": "pre",
+                "vencimento": "primeiro_dia_util",
+                "fixture": cfg.get("fixture"),
+            }
+        ]
+
+    def parse(
+        self, raw: bytes, data_ref: dt.date, mercadoria: dict | None = None
+    ) -> pd.DataFrame:
+        mercadoria = mercadoria or self.mercadorias()[0]
         texto = raw.decode(self.config.get("encoding", "latin-1"), errors="replace")
         # flavor explicito: o padrao do pandas cai em bs4+html5lib, que pode nao
         # existir num ambiente limpo. lxml ja e dependencia declarada.
@@ -99,25 +143,24 @@ class B3DiSource(Source):
         if col_vencto is None or col_ajuste is None:
             raise ValueError("boletim da B3 sem colunas de vencimento e ajuste")
 
+        regra = mercadoria.get("vencimento", "primeiro_dia_util")
         codigos = df[col_vencto].astype(str).str.strip().str.upper()
-        vencimentos = codigos.map(lambda c: self._vencimento(c, data_ref))
+        vencimentos = codigos.map(lambda c: self._vencimento(c, data_ref, regra))
         pu = pd.to_numeric(df[col_ajuste], errors="coerce")
 
         out = pd.DataFrame(
             {
                 "data_ref": data_ref,
                 "fonte": "b3",
-                "tipo": "pre",
-                "instrumento": "DI1" + codigos,
+                "tipo": mercadoria.get("tipo", "pre"),
+                "instrumento": mercadoria["codigo"] + codigos,
                 "vencimento": vencimentos,
                 "preco": pu,
             }
         ).dropna(subset=["vencimento", "preco"])
         out = out[out["preco"] > 0]
 
-        out["prazo_du"] = business_days(
-            pd.Series([data_ref] * len(out), index=out.index), out["vencimento"]
-        )
+        out["prazo_du"] = [cal.dias_uteis(data_ref, venc) for venc in out["vencimento"]]
         out = out[out["prazo_du"] > 0]
         out["prazo_anos"] = out["prazo_du"].astype(float) / 252.0
         out["taxa"] = ((VALOR_FACE / out["preco"]) ** (252.0 / out["prazo_du"]) - 1) * 100
@@ -145,10 +188,14 @@ class B3DiSource(Source):
                 return coluna
         return None
 
-    def _vencimento(self, codigo: str, data_ref: dt.date) -> dt.date | None:
-        """Converte 'F27' no primeiro dia útil de janeiro de 2027.
+    def _vencimento(
+        self, codigo: str, data_ref: dt.date, regra: str = "primeiro_dia_util"
+    ) -> dt.date | None:
+        """Converte 'F27' no vencimento do contrato de janeiro de 2027.
 
-        Contratos de DI vencem no primeiro dia útil do mês de referência.
+        O DI1 vence no primeiro dia útil do mês de referência; o DAP, no dia 15.
+        Em qualquer dos dois, cair em fim de semana ou feriado empurra para o
+        próximo pregão — é o que faz o DAP de novembro de 2026 vencer em 16/11.
         """
         meses = self.config.get("meses", {})
         if len(codigo) < 2 or codigo[0] not in meses:
@@ -164,10 +211,8 @@ class B3DiSource(Source):
         if ano < data_ref.year:
             ano += 100
 
-        primeiro = pd.Timestamp(year=ano, month=meses[codigo[0]], day=1)
-        if primeiro.weekday() >= 5:  # sábado ou domingo
-            primeiro = primeiro + pd.offsets.BDay(1)
-        return primeiro.date()
+        dia = 15 if regra == "dia_15" else 1
+        return cal.proximo_dia_util(dt.date(ano, meses[codigo[0]], dia))
 
     def _datas(self, since: dt.date | None) -> list[dt.date]:
         """Dias úteis a coletar, limitados a `max_dias_por_execucao`.

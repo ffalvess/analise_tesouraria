@@ -109,13 +109,13 @@ marcam DI1 e DAP. Misturar as duas réguas erra na quarta casa decimal do fator
 |---|---|---|
 | `tesouro_direto` | Tesouro Transparente (CSV) — **curva BR primária** | não |
 | `anbima_ettj` | ANBIMA — estrutura a termo oficial | não |
-| `b3_di` | B3 — ajustes do futuro de DI (DI1) | não |
+| `b3_di` | B3 — ajustes dos futuros de DI (DI1) e de cupom de IPCA (DAP) | não |
 | `us_treasury` | US Treasury — par yield nominal e real | não |
 | `bcb_sgs` | Banco Central — Selic, CDI, PTAX, IPCA, IBC-Br, balança | não |
 | `fx_flow` | Banco Central — movimento de câmbio contratado ⚠️ **desativada**, ver abaixo | não |
-| `focus` | Banco Central (Olinda) — Focus e Top 5 | não |
+| `focus` | Banco Central (Olinda) — Focus, Top 5 e a competência mensal do IPCA | não |
 | `comex` | Comex Stat / MDIC — balança detalhada | não |
-| `ibge_sidra` | IBGE — IPCA e desocupação (PNAD) | não |
+| `ibge_sidra` | IBGE — IPCA (variação e número-índice) e desocupação (PNAD) | não |
 | `us_macro` | FRED — CPI, desemprego, payroll, Fed Funds e as cestas do dólar | **sim** |
 | `speeches` | Fed (RSS) e BCB (feed JSON) | não |
 | `research` | Feeds públicos + `data/research_pdfs/` | não |

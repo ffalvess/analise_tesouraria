@@ -234,7 +234,7 @@ def seletor_metodo() -> str:
 # nominal. Sem isso, a tela abriria em `anbima/implicita` e o diferencial do
 # painel confrontaria inflação implícita com juro nominal americano.
 PREFERENCIA_FONTE = ["tesouro", "b3", "anbima"]
-PREFERENCIA_TIPO = ["pre", "ipca", "implicita"]
+PREFERENCIA_TIPO = ["pre", "ipca", "dap", "implicita"]
 
 
 def _ordenar(valores: list[str], preferencia: list[str]) -> list[str]:
@@ -252,7 +252,7 @@ def seletor_fonte_br(chave: str = "fonte_br") -> tuple[str, str]:
         st.sidebar.warning("Nenhuma curva brasileira ingerida.")
         return "tesouro", "pre"
 
-    rotulos_fonte = {"tesouro": "Tesouro Direto", "anbima": "ANBIMA ETTJ", "b3": "Futuros DI (B3)"}
+    rotulos_fonte = {"tesouro": "Tesouro Direto", "anbima": "ANBIMA ETTJ", "b3": "Futuros B3 (DI1 e DAP)"}
     fontes = _ordenar(list(disponivel["fonte"].unique()), PREFERENCIA_FONTE)
     fonte = st.sidebar.selectbox(
         "Fonte da curva BR",
@@ -261,7 +261,12 @@ def seletor_fonte_br(chave: str = "fonte_br") -> tuple[str, str]:
         key=f"{chave}_fonte",
     )
 
-    rotulos_tipo = {"pre": "Prefixada", "ipca": "IPCA+ (real)", "implicita": "Inflação implícita"}
+    rotulos_tipo = {
+        "pre": "Prefixada",
+        "ipca": "IPCA+ (real)",
+        "dap": "DAP — cupom de IPCA",
+        "implicita": "Inflação implícita",
+    }
     tipos = _ordenar(
         list(disponivel[disponivel["fonte"] == fonte]["tipo"].unique()), PREFERENCIA_TIPO
     )
