@@ -1,6 +1,6 @@
 """Teste de fumaça da interface.
 
-Executa de fato cada uma das dez telas com o runtime do Streamlit, contra o
+Executa de fato cada uma das onze telas com o runtime do Streamlit, contra o
 banco populado pela ingestão offline, e verifica que nenhuma levanta exceção.
 É o teste que pega quebra de coluna renomeada, chamada de API mudada e erro de
 digitação em nome de série — coisas que nenhum teste unitário alcança.
@@ -49,7 +49,7 @@ def test_pagina_renderiza_sem_excecao(pagina, ambiente_ingerido):
 
 def test_todas_as_paginas_estao_cobertas():
     """Uma página nova entra no teste sozinha; esta asserção garante que não passou despercebida."""
-    assert len(PAGINAS) == 10
+    assert len(PAGINAS) == 11
 
 
 @pytest.mark.parametrize("pagina", PAGINAS, ids=rotulo)

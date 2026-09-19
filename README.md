@@ -77,8 +77,9 @@ testar e demonstrar. Regere-os com `python scripts/gerar_fixtures.py`.
 | **Focus** | A trajetória das revisões, a dispersão entre analistas, Focus contra Top 5 e contra a curva |
 | **Inflação, emprego e atividade** | Os dois países lado a lado, no mesmo recorte |
 | **Comunicação e research** | Discursos do BCB e do Fed com score de tom, feeds públicos e os seus PDFs locais |
+| **Swap CDI × IPCA** | Marcação a mercado de um swap, da correção do índice ao MtM, com as curvas PRE e DAP |
 
-### Duas decisões metodológicas que valem explicar
+### Três decisões metodológicas que valem explicar
 
 **Convenção de taxa.** A taxa brasileira é efetiva anual em base 252 dias
 úteis; o *par yield* americano é *bond-equivalent*, com capitalização
@@ -90,6 +91,15 @@ pontos-base já num juro de 4,5% — e o erro cresce com o nível da taxa. Por i
 **Não extrapolamos.** Se a curva brasileira acaba em 8 anos, o vértice de 10
 anos fica vazio, não estimado. Um diferencial ausente é informação diferente de
 um diferencial nulo.
+
+**Duas réguas de prazo, de propósito.** Para desenhar e comparar curvas, o
+prazo é medido em anos corridos e a interpolação é spline — é o que faz sentido
+quando se sobrepõe Brasil e Estados Unidos. Para **precificar** um contrato, a
+régua muda: `analytics/calendario.py` conta dias úteis exatos pelo calendário
+de feriados nacionais, e `analytics/fatores.py` interpola *flat-forward* sobre
+o fator acumulado `(1+i)^(du/252)`, que é a convenção com que a B3 e as mesas
+marcam DI1 e DAP. Misturar as duas réguas erra na quarta casa decimal do fator
+— irrelevante num gráfico, dinheiro de verdade num notional de milhões.
 
 ---
 
