@@ -215,6 +215,67 @@ def cache_cobertura() -> pd.DataFrame:
 # ------------------------------------------------------------ barra lateral
 
 
+# Janelas de tempo dos gráficos de série. Uma lista só, compartilhada, para que
+# "3 meses" signifique o mesmo número de dias em qualquer tela — e para que
+# acrescentar uma janela nova apareça em todas de uma vez.
+PERIODOS: dict[str, int | None] = {
+    "1 semana": 7,
+    "1 mês": 30,
+    "3 meses": 91,
+    "6 meses": 182,
+    "1 ano": 365,
+    "Tudo": None,
+}
+
+
+def seletor_periodo(
+    chave: str, padrao: str = "1 ano", rotulo: str = "Período"
+) -> tuple[str, int | None]:
+    """Janela de tempo padronizada. Devolve o rótulo escolhido e o número de dias."""
+    nomes = list(PERIODOS)
+    escolha = st.radio(
+        rotulo,
+        nomes,
+        index=nomes.index(padrao),
+        horizontal=True,
+        key=chave,
+        help="Recorta o gráfico abaixo. A janela conta a partir da observação mais recente.",
+    )
+    return escolha, PERIODOS[escolha]
+
+
+def recortar_periodo(
+    serie: pd.DataFrame, dias: int | None, coluna: str = "data_ref"
+) -> pd.DataFrame:
+    """Últimos `dias` corridos da série, ancorados na observação mais recente.
+
+    A âncora é a última data com dado, e não a data de hoje. Numa segunda-feira,
+    ou num dia em que a coleta ainda não rodou, ancorar em hoje encolheria a
+    janela em silêncio: "1 semana" mostraria três pregões e pareceria que
+    faltam dados, quando o que houve foi fim de semana.
+    """
+    if dias is None or serie.empty:
+        return serie
+    datas = pd.to_datetime(serie[coluna])
+    corte = datas.max() - pd.Timedelta(days=dias)
+    return serie[datas >= corte].reset_index(drop=True)
+
+
+def resumo_periodo(serie: pd.DataFrame, coluna: str = "taxa") -> dict[str, float]:
+    """Nível atual, variação na janela e extremos — o que se lê num gráfico de taxa.
+
+    Espera a série ordenada por data, que é como `queries.historico_curva`
+    devolve; a variação é do primeiro ao último ponto da janela já recortada.
+    """
+    valores = serie[coluna].astype(float)
+    return {
+        "atual": float(valores.iloc[-1]),
+        "variacao_bps": float((valores.iloc[-1] - valores.iloc[0]) * 100),
+        "minimo": float(valores.min()),
+        "maximo": float(valores.max()),
+    }
+
+
 def seletor_metodo() -> str:
     """Método de interpolação, compartilhado por todas as páginas de curva."""
     return st.sidebar.selectbox(

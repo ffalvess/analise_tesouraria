@@ -92,21 +92,38 @@ st.caption(
 )
 
 st.subheader("Histórico do vértice")
-prazo_alvo = st.slider("Prazo (anos)", 0.5, 15.0, 5.0, 0.5)
-historico = common.cache_historico(
-    "curve_br", prazo_alvo, 0.4, {"fonte": fonte, "tipo": tipo}
-)
+seletor, janela = st.columns([1, 2])
+with seletor:
+    prazo_alvo = st.slider("Prazo (anos)", 0.5, 15.0, 5.0, 0.5)
+with janela:
+    rotulo_periodo, dias = common.seletor_periodo("periodo_br")
+
+completo = common.cache_historico("curve_br", prazo_alvo, 0.4, {"fonte": fonte, "tipo": tipo})
+historico = common.recortar_periodo(completo, dias)
 if historico.empty:
     st.caption("Sem histórico suficiente perto desse prazo.")
 else:
+    resumo = common.resumo_periodo(historico)
+    metricas_periodo = st.columns(4)
+    metricas_periodo[0].metric("Taxa atual", charts.formatar_pct(resumo["atual"]))
+    metricas_periodo[1].metric(
+        f"Variação em {rotulo_periodo.lower()}", charts.formatar_bps(resumo["variacao_bps"])
+    )
+    metricas_periodo[2].metric("Mínimo", charts.formatar_pct(resumo["minimo"]))
+    metricas_periodo[3].metric("Máximo", charts.formatar_pct(resumo["maximo"]))
+
     st.plotly_chart(
         charts.grafico_series(
             [(f"Brasil {prazo_alvo:g}a", historico.rename(columns={"taxa": "valor"}))],
-            titulo=f"Taxa de {prazo_alvo:g} anos ao longo do tempo",
+            titulo=f"Taxa de {prazo_alvo:g} anos — {rotulo_periodo.lower()}",
             eixo_y="Taxa (% a.a.)",
             sufixo="%",
         ),
         width="stretch",
+    )
+    st.caption(
+        f"{len(historico)} pregões na janela, de {historico['data_ref'].iloc[0]:%d/%m/%Y} "
+        f"a {historico['data_ref'].iloc[-1]:%d/%m/%Y}."
     )
 
 common.rodape()

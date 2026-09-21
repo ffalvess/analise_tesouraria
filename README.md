@@ -68,8 +68,8 @@ testar e demonstrar. Regere-os com `python scripts/gerar_fixtures.py`.
 | Página | O que responde |
 |---|---|
 | **Painel** | Como estão as duas curvas hoje, quanto vale o carrego e o que o fluxo fez na semana |
-| **Curva Brasil** | Curva do vencimento mais curto ao mais longo, em pré, IPCA+ ou implícita, por fonte; taxas a termo |
-| **Curva Estados Unidos** | Curva nominal e real (TIPS), e a inflação implícita entre elas |
+| **Curva Brasil** | Curva do vencimento mais curto ao mais longo, em pré, IPCA+, DAP ou implícita, por fonte; taxas a termo e histórico do vértice por período |
+| **Curva Estados Unidos** | Curva nominal e real (TIPS), a inflação implícita entre elas e o histórico do vértice por período |
 | **Comparação de datas** | A mesma curva em N datas sobrepostas, com a variação em bps por vértice e a leitura do movimento |
 | **Diferencial BR × EUA** | O prêmio por vértice, o diferencial real, a série histórica e a correlação com o dólar |
 | **Fluxo cambial** | Prêmio do real contra as cestas de moedas; fluxo semanal contra a cotação, regressão e beta móvel |

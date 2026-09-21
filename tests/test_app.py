@@ -47,6 +47,33 @@ def test_pagina_renderiza_sem_excecao(pagina, ambiente_ingerido):
     )
 
 
+def test_periodo_recorta_o_historico_do_vertice(ambiente_ingerido):
+    """Trocar o período encurta de fato o gráfico de histórico da curva americana.
+
+    O histórico começa em 2015: sem recorte, o gráfico mostra mais de uma
+    década de pregões diários de uma vez. Este teste compara o número de
+    observações em duas janelas para garantir que o seletor age sobre os dados,
+    e não apenas sobre o título.
+    """
+    pagina = UI / "pages" / "2_Curva_Estados_Unidos.py"
+
+    def pregoes(periodo: str) -> int:
+        app = AppTest.from_file(str(pagina), default_timeout=TEMPO_LIMITE)
+        app.run()
+        app.radio(key="periodo_us").set_value(periodo).run()
+        assert not app.exception, " | ".join(str(e.message) for e in app.exception)
+        janela = [c for c in app.caption if "pregões na janela" in str(c.value)]
+        assert janela, f"a tela não informou o tamanho da janela em {periodo}"
+        return int(str(janela[0].value).split()[0])
+
+    uma_semana = pregoes("1 semana")
+    um_ano = pregoes("1 ano")
+    tudo = pregoes("Tudo")
+
+    assert uma_semana <= 6
+    assert uma_semana < um_ano < tudo
+
+
 def test_swap_usa_as_curvas_ingeridas(ambiente_ingerido):
     """A tela do swap também roda com os dados do banco, e não só com o exemplo.
 
