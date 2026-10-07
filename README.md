@@ -70,7 +70,8 @@ testar e demonstrar. Regere-os com `python scripts/gerar_fixtures.py`.
 | **Painel** | Como estão as duas curvas hoje, quanto vale o carrego e o que o fluxo fez na semana |
 | **Curva Brasil** | Curva do vencimento mais curto ao mais longo, em pré, IPCA+ ou implícita, por fonte; taxas a termo |
 | **Curva Estados Unidos** | Curva nominal e real (TIPS), e a inflação implícita entre elas |
-| **Comparação de datas** | A mesma curva em N datas sobrepostas, com a variação em bps por vértice e a leitura do movimento |
+| **Comparação de datas — Brasil** | A mesma curva em N datas sobrepostas, com a variação em bps por vértice e a leitura do movimento |
+| **Comparação de datas — EUA** | O mesmo para a Treasury nominal, real (TIPS) ou o breakeven, com a inclinação 10a−2a de cada data e o aviso de inversão |
 | **Diferencial BR × EUA** | O prêmio por vértice, o diferencial real, a série histórica e a correlação com o dólar |
 | **Fluxo cambial** | Prêmio do real contra as cestas de moedas; fluxo semanal contra a cotação, regressão e beta móvel |
 | **Balança comercial** | Exportação, importação, saldo, e o descasamento entre saldo registrado e dólares internalizados |
@@ -299,7 +300,7 @@ Nenhum teste toca a rede nem o banco do usuário. Eles cobrem os parsers de cada
 fonte contra as fixtures, a conversão de convenção de taxa com valores
 calculados à mão, a interpolação, os diferenciais, o tom, a idempotência da
 gravação, a ida e volta dos snapshots (com verificação de determinismo por
-hash) e — via `streamlit.testing` — a renderização real das dez telas, incluindo
+hash) e — via `streamlit.testing` — a renderização real das onze telas, incluindo
 a hidratação automática a partir dos Parquet.
 
 O GitHub Actions roda lint e testes a cada push, no mesmo `requirements.txt`
@@ -322,7 +323,7 @@ src/tesouraria/
   cli.py          tesouraria ingest | status | snapshot | serve
   sources/        uma fonte por arquivo (fetch e parse separados)
   analytics/      curve, differentials, fxflow, tone
-  ui/             app.py, charts.py e as nove páginas
+  ui/             app.py, charts.py e as dez páginas
 data/
   fixtures/       amostras sintéticas (versionadas)
   snapshots/      dados reais em Parquet, atualizados pelo Actions

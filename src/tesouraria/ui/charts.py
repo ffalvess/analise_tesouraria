@@ -1,6 +1,6 @@
 """Paleta, tema e construtores de gráfico.
 
-Concentrar isto num módulo é o que faz as nove páginas lerem como um único
+Concentrar isto num módulo é o que faz as dez páginas lerem como um único
 sistema: mesmas cores para os mesmos significados (Brasil sempre azul, EUA
 sempre laranja), mesma altura, mesma grade, mesmo comportamento de hover.
 """
