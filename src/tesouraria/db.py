@@ -249,6 +249,24 @@ def podar(con: duckdb.DuckDBPyConnection, declaradas: set[str]) -> dict[str, int
     return removidas
 
 
+def ultimas_datas(con: duckdb.DuckDBPyConnection, fonte: str) -> dict[str, dt.date]:
+    """Data da última observação gravada de cada série de uma fonte.
+
+    Uma série ausente do dicionário nunca foi coletada — é o sinal que as
+    fontes usam para buscar o histórico inteiro em vez de só a janela recente.
+    """
+    linhas = con.execute(
+        """
+        SELECT serie_id, MAX(data_ref)
+        FROM series_macro
+        WHERE fonte = ? AND valor IS NOT NULL
+        GROUP BY serie_id
+        """,
+        [fonte],
+    ).fetchall()
+    return {str(serie_id): data for serie_id, data in linhas}
+
+
 def limpar_tabela(
     con: duckdb.DuckDBPyConnection, tabela: str, fontes: Sequence[str] = ()
 ) -> int:

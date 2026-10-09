@@ -14,9 +14,11 @@ import datetime as dt
 import json
 import logging
 
+import duckdb
 import pandas as pd
 
-from tesouraria.sources.base import Source
+from tesouraria import db
+from tesouraria.sources.base import Source, inicio_da_coleta
 from tesouraria.sources.validation import aceitar_serie
 
 logger = logging.getLogger(__name__)
@@ -47,9 +49,13 @@ class BcbSgsSource(Source):
     name = "bcb_sgs"
     table = "series_macro"
 
+    def prepare(self, con: duckdb.DuckDBPyConnection) -> None:
+        self._ultimas = db.ultimas_datas(con, "bcb_sgs")
+
     def collect(self, since: dt.date | None = None) -> pd.DataFrame:
         cfg = self.config
-        inicio = since or INICIO_PADRAO
+        ultimas = getattr(self, "_ultimas", {})
+        revisao = int(cfg.get("revisao_dias", 0))
         fim = dt.date.today()
 
         fixture_payload = self._fixture_payload() if self.offline else None
@@ -57,6 +63,7 @@ class BcbSgsSource(Source):
 
         for serie in cfg.get("series", []):
             codigo = str(serie["codigo"])
+            inicio = inicio_da_coleta(since, ultimas.get(codigo), INICIO_PADRAO, revisao)
             try:
                 if fixture_payload is not None:
                     dados = fixture_payload.get(codigo, [])

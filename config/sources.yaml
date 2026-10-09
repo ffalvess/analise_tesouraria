@@ -107,6 +107,11 @@ sources:
     fixture: "bcb_sgs.json"
     # A API do SGS limita janelas longas; a ingestão fatia por blocos de anos.
     anos_por_requisicao: 10
+    # Cada série recomeça a coleta este número de dias antes da última
+    # observação gravada. Sem isso, a janela de 7 dias da coleta diária nunca
+    # alcança o IPCA nem o IBC-Br, que saem semanas depois do mês a que se
+    # referem. Ver `sources/base.py::inicio_da_coleta`.
+    revisao_dias: 400
     # `faixa: [min, max]` é a faixa plausível da série. Valores fora dela fazem a
     # série ser rejeitada na ingestão, com aviso no log.
     #
@@ -209,6 +214,11 @@ sources:
     url: "https://api.stlouisfed.org/fred/series/observations"
     fixture: "us_macro.json"
     # Sem FRED_API_KEY a fonte é pulada e registrada como tal em ingest_log.
+    #
+    # Mesma lógica do SGS: o PIB do trimestre sai um mês depois de fechado e é
+    # revisado nos dois meses seguintes. Série que ainda não está no banco
+    # busca o histórico inteiro sozinha — acrescentar uma linha abaixo basta.
+    revisao_dias: 400
     series:
       - { serie_id: "FEDFUNDS",  nome: "Fed Funds effective rate", unidade: "% a.a.",     faixa: [0, 25] }
       - { serie_id: "DFF",       nome: "Fed Funds diário",         unidade: "% a.a.",     faixa: [0, 25] }
@@ -228,6 +238,65 @@ sources:
       - { serie_id: "DTWEXBGS",   nome: "Dólar — cesta ampla",       unidade: "índice", faixa: [50, 200] }
       - { serie_id: "DTWEXAFEGS", nome: "Dólar — economias avançadas", unidade: "índice", faixa: [50, 200] }
       - { serie_id: "DTWEXEMEGS", nome: "Dólar — emergentes",        unidade: "índice", faixa: [50, 250] }
+
+      # ---------------------------------------------- página Macro EUA
+      # Inflação. O Fed persegue 2% no PCE; o CPI é o que o mercado opera no dia.
+      # Os componentes do CPI são da BLS, dessazonalizados (prefixo CUSR).
+      - { serie_id: "PCEPI",          nome: "PCE — índice de preços",            unidade: "índice", faixa: [50, 300] }
+      - { serie_id: "PCEPILFE",       nome: "Núcleo do PCE",                     unidade: "índice", faixa: [50, 300] }
+      - { serie_id: "CPIUFDSL",       nome: "CPI — alimentos",                   unidade: "índice", faixa: [100, 1000] }
+      - { serie_id: "CPIENGSL",       nome: "CPI — energia",                     unidade: "índice", faixa: [100, 1000] }
+      - { serie_id: "CUSR0000SACL1E", nome: "CPI — bens ex-alimentos e energia", unidade: "índice", faixa: [100, 1000] }
+      - { serie_id: "CUSR0000SAH1",   nome: "CPI — moradia (shelter)",           unidade: "índice", faixa: [100, 1000] }
+      - { serie_id: "CUSR0000SASLE",  nome: "CPI — serviços ex-energia",         unidade: "índice", faixa: [100, 1000] }
+
+      # Mercado de trabalho.
+      - { serie_id: "U6RATE",        nome: "Desemprego amplo (U-6)",               unidade: "%",           faixa: [3, 35] }
+      - { serie_id: "ICSA",          nome: "Pedidos iniciais de seguro-desemprego", unidade: "pessoas",    faixa: [100000, 7000000] }
+      - { serie_id: "CIVPART",       nome: "Taxa de participação",                 unidade: "%",           faixa: [55, 70] }
+      - { serie_id: "CES0500000003", nome: "Salário médio por hora (privado)",     unidade: "US$/hora",    faixa: [15, 60] }
+      - { serie_id: "JTSJOL",        nome: "Vagas em aberto (JOLTS)",              unidade: "mil",         faixa: [1000, 15000] }
+      - { serie_id: "UNEMPLOY",      nome: "Desempregados",                        unidade: "mil pessoas", faixa: [3000, 30000] }
+
+      # PIB pela ótica da despesa. Níveis em US$ bilhões encadeados de 2017
+      # (taxa anual dessazonalizada) e contribuições do BEA ao crescimento do
+      # PIB, em pontos percentuais anualizados. As contribuições somam o PIB
+      # por construção; os níveis encadeados, não — por isso as duas coisas.
+      - { serie_id: "GDPC1",            nome: "PIB real",                          unidade: "US$ bi de 2017", faixa: [10000, 40000] }
+      - { serie_id: "PCECC96",          nome: "Consumo das famílias (real)",       unidade: "US$ bi de 2017", faixa: [5000, 30000] }
+      - { serie_id: "GPDIC1",           nome: "Investimento privado (real)",       unidade: "US$ bi de 2017", faixa: [1000, 8000] }
+      - { serie_id: "GCEC1",            nome: "Gastos do governo (real)",          unidade: "US$ bi de 2017", faixa: [2000, 6000] }
+      - { serie_id: "EXPGSC1",          nome: "Exportações (real)",                unidade: "US$ bi de 2017", faixa: [800, 5000] }
+      - { serie_id: "IMPGSC1",          nome: "Importações (real)",                unidade: "US$ bi de 2017", faixa: [1000, 7000] }
+      - { serie_id: "DPCERY2Q224SBEA",  nome: "Contribuição ao PIB — consumo",      unidade: "p.p.", faixa: [-30, 30] }
+      - { serie_id: "A006RY2Q224SBEA",  nome: "Contribuição ao PIB — investimento", unidade: "p.p.", faixa: [-20, 20] }
+      - { serie_id: "A822RY2Q224SBEA",  nome: "Contribuição ao PIB — governo",      unidade: "p.p.", faixa: [-10, 10] }
+      - { serie_id: "A020RY2Q224SBEA",  nome: "Contribuição ao PIB — exportações",  unidade: "p.p.", faixa: [-15, 15] }
+      - { serie_id: "A021RY2Q224SBEA",  nome: "Contribuição ao PIB — importações",  unidade: "p.p.", faixa: [-15, 15] }
+
+      # PIB pela ótica da produção (GDP by Industry, BEA). Contribuições ao
+      # crescimento por setor, que se somam: com o total, os setores de bens
+      # (agro + extrativa + construção + transformação) e os de utilities, os
+      # três grandes grupos no recorte do IBGE saem exatos — ver
+      # `analytics/macro_eua.py`. A série começa em 2005.
+      - { serie_id: "CPGDPAI",  nome: "Contribuição por setor — PIB (total)",          unidade: "p.p.", faixa: [-40, 40] }
+      - { serie_id: "CPGDPGPI", nome: "Contribuição por setor — produtores de bens",   unidade: "p.p.", faixa: [-15, 15] }
+      - { serie_id: "CPGDPAFH", nome: "Contribuição por setor — agropecuária",         unidade: "p.p.", faixa: [-3, 3] }
+      - { serie_id: "CPGDPU",   nome: "Contribuição por setor — utilities",            unidade: "p.p.", faixa: [-2, 2] }
+      - { serie_id: "CPGDPC",   nome: "Contribuição por setor — construção",           unidade: "p.p.", faixa: [-5, 5] }
+      - { serie_id: "CPGDPMD",  nome: "Contribuição por setor — transformação (duráveis)",     unidade: "p.p.", faixa: [-10, 10] }
+      - { serie_id: "CPGDPMN",  nome: "Contribuição por setor — transformação (não duráveis)", unidade: "p.p.", faixa: [-5, 5] }
+      # Volume de cada setor (índice de quantidade, 2017 = 100; serviços em
+      # US$ bilhões encadeados), para o crescimento de cada um.
+      - { serie_id: "VAQIAFH", nome: "Valor adicionado — agropecuária (volume)",   unidade: "índice",         faixa: [50, 200] }
+      - { serie_id: "VAQIM",   nome: "Valor adicionado — extrativa (volume)",      unidade: "índice",         faixa: [30, 250] }
+      - { serie_id: "VAQIC",   nome: "Valor adicionado — construção (volume)",     unidade: "índice",         faixa: [40, 200] }
+      - { serie_id: "VAQIMA",  nome: "Valor adicionado — transformação (volume)",  unidade: "índice",         faixa: [50, 200] }
+      - { serie_id: "RVASPI",  nome: "Valor adicionado — serviços privados (real)", unidade: "US$ bi de 2017", faixa: [8000, 30000] }
+      # Produção industrial do Fed: a leitura mensal da indústria, que o PIB
+      # por setor só traz a cada trimestre.
+      - { serie_id: "INDPRO", nome: "Produção industrial",                  unidade: "índice", faixa: [60, 150] }
+      - { serie_id: "IPMAN",  nome: "Produção industrial — transformação",  unidade: "índice", faixa: [60, 150] }
 
 # Grade padrão de vértices (em anos) usada para tornar as curvas comparáveis.
 grade_padrao: [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0]

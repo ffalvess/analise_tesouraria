@@ -123,6 +123,32 @@ class Source(ABC):
         return result
 
 
+def inicio_da_coleta(
+    since: dt.date | None,
+    ultima: dt.date | None,
+    padrao: dt.date,
+    revisao_dias: int = 0,
+) -> dt.date:
+    """Data inicial da coleta de uma série, a partir do que já está gravado.
+
+    A coleta diária pede "os últimos sete dias", e isso só serve a séries
+    diárias. Série mensal ou trimestral é datada pelo início do período e
+    publicada semanas depois: o CPI de agosto (2026-08-01) sai em meados de
+    setembro e o PIB do segundo trimestre (2026-04-01) no fim de julho, com
+    revisões em agosto e setembro. Pedidas a partir de "sete dias atrás", essas
+    observações ficam para sempre fora da janela — foi assim que o CPI e o IPCA
+    pararam em julho no aplicativo publicado.
+
+    A regra: série nunca coletada busca o histórico inteiro (`padrao`); série
+    já gravada recomeça `revisao_dias` antes da última observação, o que cobre
+    a divulgação seguinte e as revisões das anteriores. Sem `since`, vale o
+    histórico inteiro, como antes.
+    """
+    if since is None or ultima is None:
+        return padrao
+    return min(since, ultima - dt.timedelta(days=revisao_dias))
+
+
 def to_date(value: Any, dayfirst: bool = True) -> Any:
     """Converte para `datetime.date`, devolvendo NaT quando não der."""
     parsed = pd.to_datetime(value, dayfirst=dayfirst, errors="coerce")

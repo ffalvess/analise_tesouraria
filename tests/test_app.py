@@ -1,6 +1,6 @@
 """Teste de fumaça da interface.
 
-Executa de fato cada uma das onze telas com o runtime do Streamlit, contra o
+Executa de fato cada uma das doze telas com o runtime do Streamlit, contra o
 banco populado pela ingestão offline, e verifica que nenhuma levanta exceção.
 É o teste que pega quebra de coluna renomeada, chamada de API mudada e erro de
 digitação em nome de série — coisas que nenhum teste unitário alcança.
@@ -49,7 +49,7 @@ def test_pagina_renderiza_sem_excecao(pagina, ambiente_ingerido):
 
 def test_todas_as_paginas_estao_cobertas():
     """Uma página nova entra no teste sozinha; esta asserção garante que não passou despercebida."""
-    assert len(PAGINAS) == 11
+    assert len(PAGINAS) == 12
 
 
 @pytest.mark.parametrize("pagina", PAGINAS, ids=rotulo)
@@ -107,7 +107,7 @@ def ambiente_producao(tmp_path):
 @pytest.mark.skipif(not TEM_SNAPSHOTS, reason="sem snapshots reais no repositório")
 @pytest.mark.parametrize("pagina", PAGINAS, ids=rotulo)
 def test_pagina_renderiza_com_os_dados_reais(pagina, ambiente_producao):
-    """As onze telas contra os dados que estão publicados de verdade.
+    """As doze telas contra os dados que estão publicados de verdade.
 
     O teste irmão, sobre as amostras, garante que a lógica funciona quando tudo
     está presente. Este garante que ela não explode quando não está.
@@ -247,3 +247,42 @@ def test_aviso_de_modo_offline_aparece(ambiente_ingerido):
     textos = " ".join(str(w.value) for w in app.warning)
     assert "Modo offline" in textos
     assert "Não são dados reais" in textos
+
+
+def test_macro_eua_monta_as_quatro_abas(ambiente_ingerido):
+    """Com todas as séries nas amostras, nenhuma seção pode cair no aviso de ausente.
+
+    O teste genérico só garante que a página não quebra — e ela não quebra
+    justamente porque cada seção sabe se ausentar. Sem esta checagem, um código
+    trocado no YAML viraria uma página cheia de "ainda não coletado" que passa
+    em todos os testes.
+    """
+    app = AppTest.from_file(str(UI / "pages" / "8_Macro_EUA.py"), default_timeout=TEMPO_LIMITE)
+    app.run()
+
+    assert not app.exception, " | ".join(str(e.message) for e in app.exception)
+    ausentes = [c.value for c in app.caption if "Ainda não coletado" in c.value]
+    assert not ausentes, ausentes
+
+    rotulos = {m.label for m in app.metric}
+    assert {"Desemprego (U-3)", "Regra de Sahm", "PIB tri anualizado", "Indústria"} <= rotulos
+    assert all(m.value != "—" for m in app.metric), [m.label for m in app.metric if m.value == "—"]
+    assert len(app.get("plotly_chart")) >= 14
+
+
+def test_macro_eua_reage_aos_controles(ambiente_ingerido):
+    """Período, medida e filtros: cada combinação precisa redesenhar sem erro."""
+    app = AppTest.from_file(str(UI / "pages" / "8_Macro_EUA.py"), default_timeout=TEMPO_LIMITE)
+    app.run()
+
+    def controle(chave):
+        return next(g for g in app.get("button_group") if g.key == chave)
+
+    for periodo in ("2 anos", "Tudo"):
+        controle("macro_eua_periodo").set_value(periodo).run()
+        assert not app.exception, " | ".join(str(e.message) for e in app.exception)
+
+    controle("macro_eua_medida").set_value("CPI").run()
+    controle("macro_eua_componentes").set_value([]).run()
+    controle("macro_eua_setores").set_value(["Agropecuária"]).run()
+    assert not app.exception, " | ".join(str(e.message) for e in app.exception)

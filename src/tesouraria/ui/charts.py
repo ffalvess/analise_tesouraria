@@ -1,6 +1,6 @@
 """Paleta, tema e construtores de gráfico.
 
-Concentrar isto num módulo é o que faz as dez páginas lerem como um único
+Concentrar isto num módulo é o que faz as onze páginas lerem como um único
 sistema: mesmas cores para os mesmos significados (Brasil sempre azul, EUA
 sempre laranja), mesma altura, mesma grade, mesmo comportamento de hover.
 """
@@ -33,16 +33,42 @@ def _escuro() -> bool:
         return False
 
 
+def tinta() -> str:
+    """Cor do texto do tema. Desenha também a linha de total, que não é uma série."""
+    return "#E6EAF2" if _escuro() else "#1F2733"
+
+
+def superficie() -> str:
+    """Fundo da página — a cor do filete que separa segmentos empilhados."""
+    return "#0E1117" if _escuro() else "#FFFFFF"
+
+
 def aplicar_tema(fig: go.Figure, altura: int = ALTURA_PADRAO, titulo: str = "") -> go.Figure:
     escuro = _escuro()
     grade = "rgba(255,255,255,0.10)" if escuro else "rgba(0,0,0,0.08)"
-    texto = "#E6EAF2" if escuro else "#1F2733"
+    texto = tinta()
 
+    # A legenda fica logo acima da área do gráfico; o título, no topo da figura.
+    # Com os dois, a margem de cima abre espaço para ambos — antes o título caía
+    # em cima dos primeiros itens da legenda.
+    com_legenda = sum(1 for trace in fig.data if trace.showlegend is not False) > 1
     fig.update_layout(
         template="plotly_dark" if escuro else "plotly_white",
         height=altura,
-        title=titulo or None,
-        margin={"l": 10, "r": 10, "t": 50 if titulo else 30, "b": 10},
+        title=(
+            {
+                "text": titulo,
+                "x": 0,
+                "xanchor": "left",
+                "y": 1,
+                "yanchor": "top",
+                "yref": "container",
+                "pad": {"t": 10},
+            }
+            if titulo
+            else None
+        ),
+        margin={"l": 10, "r": 10, "t": (85 if com_legenda else 50) if titulo else 30, "b": 10},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={"color": texto, "size": 13},
@@ -81,6 +107,21 @@ def degrade(n: int, cor_base: str = BR) -> list[str]:
         r, g, b = (int(canal * peso + 255 * (1 - peso)) for canal in canais)
         cores.append(f"rgb({r}, {g}, {b})")
     return cores
+
+
+def formato_data(datas) -> str:
+    """Formato da data no cabeçalho do hover, conforme a frequência da série.
+
+    Sem isso o plotly escreve "Apr 1, 2026" para o PIB do segundo trimestre —
+    em inglês e com um dia que o dado não tem.
+    """
+    unicas = pd.Series(pd.to_datetime(pd.Series(datas)).dropna().unique()).sort_values()
+    dias = unicas.diff().dt.days.median() if len(unicas) > 1 else 1
+    if dias > 80:
+        return "%Y T%q"
+    if dias > 20:
+        return "%m/%Y"
+    return "%d/%m/%Y"
 
 
 def coluna(dados: pd.DataFrame, nome: str) -> pd.Series:
@@ -158,6 +199,7 @@ def grafico_series(
     eixo_y: str = "",
     sufixo: str = "",
     cores: list[str] | None = None,
+    formato: str = ".2f",
 ) -> go.Figure:
     """Linhas temporais empilhadas no mesmo eixo."""
     fig = go.Figure()
@@ -173,10 +215,15 @@ def grafico_series(
                 name=rotulo,
                 mode="lines",
                 line={"width": 2, "color": cores[indice % len(cores)]},
-                hovertemplate="%{y:.2f}" + sufixo + "<extra>" + rotulo + "</extra>",
+                hovertemplate="%{y:" + formato + "}" + sufixo + "<extra>" + rotulo + "</extra>",
             )
         )
 
+    datas = [
+        pd.to_datetime(coluna(d, coluna_data)) for _, d in series if d is not None and not d.empty
+    ]
+    if datas:
+        fig.update_xaxes(hoverformat=formato_data(pd.concat(datas)))
     fig.update_yaxes(title=eixo_y, ticksuffix=sufixo)
     return aplicar_tema(fig, titulo=titulo)
 
@@ -231,6 +278,119 @@ def grafico_barras_linha(
         },
         barmode="relative",
     )
+    return aplicar_tema(fig, titulo=titulo)
+
+
+def linha_referencia(fig: go.Figure, y: float, texto: str) -> go.Figure:
+    """Linha horizontal de referência — uma meta, um limiar —, rotulada no gráfico.
+
+    Pontilhada porque é um patamar, não um dado; o rótulo fica na própria linha
+    para ninguém precisar de legenda para saber o que ela marca.
+    """
+    fig.add_hline(
+        y=y,
+        line_dash="dot",
+        line_width=1.2,
+        line_color=CINZA,
+        annotation_text=texto,
+        annotation_position="top left",
+        annotation_font={"size": 12, "color": CINZA},
+    )
+    return fig
+
+
+def grafico_contribuicoes(
+    quadro: pd.DataFrame,
+    componentes: list[tuple[str, str, str]],
+    total: tuple[str, str] | None = None,
+    titulo: str = "",
+    eixo_y: str = "p.p. da taxa anualizada",
+) -> go.Figure:
+    """Contribuições empilhadas por período, com a linha do total por cima.
+
+    `componentes` traz (coluna, rótulo, cor) na ordem do empilhamento. O
+    empilhamento é relativo — as contribuições negativas descem do zero e as
+    positivas sobem —, de modo que a altura líquida das barras é o total, e a
+    linha confirma a conta. Tudo em pontos percentuais, num eixo só. Um filete
+    na cor do fundo separa os segmentos, para vizinhos de cor parecida não se
+    fundirem.
+    """
+    fig = go.Figure()
+    if quadro is None or quadro.empty:
+        return aplicar_tema(fig, titulo=titulo)
+
+    x = pd.to_datetime(quadro["data_ref"])
+    for nome_coluna, rotulo, cor in componentes:
+        fig.add_trace(
+            go.Bar(
+                x=x,
+                y=quadro[nome_coluna],
+                name=rotulo,
+                marker={"color": cor, "line": {"color": superficie(), "width": 1}},
+                hovertemplate="%{y:.2f} p.p.<extra>" + rotulo + "</extra>",
+            )
+        )
+    if total is not None:
+        coluna_total, rotulo_total = total
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=quadro[coluna_total],
+                name=rotulo_total,
+                mode="lines+markers",
+                line={"color": tinta(), "width": 2},
+                marker={"size": 8, "color": tinta(), "line": {"color": superficie(), "width": 2}},
+                hovertemplate="%{y:.2f}%<extra>" + rotulo_total + "</extra>",
+            )
+        )
+
+    fig.add_hline(y=0, line_width=1, line_color=CINZA, opacity=0.6)
+    fig.update_layout(barmode="relative", bargap=0.3)
+    fig.update_xaxes(hoverformat=formato_data(x))
+    fig.update_yaxes(title=eixo_y)
+    return aplicar_tema(fig, titulo=titulo)
+
+
+def grafico_barras_media(
+    barras: pd.DataFrame,
+    media: pd.DataFrame,
+    rotulo_barras: str,
+    rotulo_media: str,
+    titulo: str = "",
+    eixo_y: str = "",
+    formato: str = ",.0f",
+) -> go.Figure:
+    """O dado bruto em barras cinzas e a média móvel em destaque, na mesma escala.
+
+    O mês a mês é ruidoso: fica em cinza, como contexto. A média é o sinal e
+    leva a cor — é ela que o olho deve seguir.
+    """
+    fig = go.Figure()
+    if barras is not None and not barras.empty:
+        fig.add_trace(
+            go.Bar(
+                x=pd.to_datetime(barras["data_ref"]),
+                y=barras["valor"],
+                name=rotulo_barras,
+                marker={"color": CINZA, "opacity": 0.45},
+                hovertemplate="%{y:" + formato + "}<extra>" + rotulo_barras + "</extra>",
+            )
+        )
+    if media is not None and not media.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=pd.to_datetime(media["data_ref"]),
+                y=media["valor"],
+                name=rotulo_media,
+                mode="lines",
+                line={"color": US, "width": 2.4},
+                hovertemplate="%{y:" + formato + "}<extra>" + rotulo_media + "</extra>",
+            )
+        )
+    fig.add_hline(y=0, line_width=1, line_color=CINZA, opacity=0.6)
+    if barras is not None and not barras.empty:
+        fig.update_xaxes(hoverformat=formato_data(barras["data_ref"]))
+    fig.update_yaxes(title=eixo_y)
     return aplicar_tema(fig, titulo=titulo)
 
 

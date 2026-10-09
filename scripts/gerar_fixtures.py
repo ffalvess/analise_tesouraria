@@ -409,6 +409,99 @@ fred_payload = {
     "DTWEXEMEGS": fred(dias, passeio(158, 0.10, 0.004)),
     "T10Y2Y": fred(dias, inclin_us * 0.8),
 }
+
+
+# ------------------------------------------------------ séries da Macro EUA
+# Gerador próprio: tirar números do `rng` principal deslocaria tudo o que vem
+# depois e mudaria as outras amostras sem motivo.
+rng_eua = np.random.default_rng(20261009)
+trimestres_us = pd.date_range("2024-01-01", "2026-06-30", freq="QS")
+semanas = pd.date_range("2024-01-06", FIM, freq="W-SAT")
+q = len(trimestres_us)
+
+
+def indice_precos(inicial: float, inflacao_anual: float, vol: float) -> np.ndarray:
+    """Índice mensal que cresce à inflação pedida, com ruído."""
+    mensal = (1 + inflacao_anual) ** (1 / 12) - 1
+    return inicial * np.cumprod(1 + mensal + rng_eua.normal(0, vol, len(meses)))
+
+
+def encadear(inicial: float, crescimento_anualizado: np.ndarray) -> np.ndarray:
+    """Nível trimestral a partir do crescimento anualizado (% a.a.)."""
+    fatores = (1 + np.asarray(crescimento_anualizado) / 100) ** 0.25
+    return inicial * np.cumprod(fatores)
+
+
+# PIB pela despesa: crescimento anualizado de cada componente e a
+# contribuição = participação x crescimento, como o BEA publica. O PIB cresce a
+# soma das contribuições, de modo que as amostras fecham como o dado real.
+participacao = {"C": 0.68, "I": 0.18, "G": 0.17, "X": 0.11, "M": -0.14}
+crescimento = {
+    "C": rng_eua.normal(2.3, 0.8, q),
+    "I": rng_eua.normal(2.0, 4.0, q),
+    "G": rng_eua.normal(1.5, 1.0, q),
+    "X": rng_eua.normal(2.0, 4.0, q),
+    "M": rng_eua.normal(3.0, 5.0, q),
+}
+contribuicao = {k: participacao[k] * crescimento[k] for k in participacao}
+crescimento_pib = sum(contribuicao.values())
+
+# PIB pela produção: o total é o mesmo PIB; os setores somam a ele.
+setores = {
+    "AFH": rng_eua.normal(0.02, 0.15, q),
+    "M": rng_eua.normal(0.03, 0.20, q),  # extrativa: só entra dentro dos bens
+    "U": rng_eua.normal(0.02, 0.12, q),
+    "C": rng_eua.normal(0.05, 0.12, q),
+    "MD": rng_eua.normal(0.10, 0.25, q),
+    "MN": rng_eua.normal(0.05, 0.15, q),
+    "GOV": rng_eua.normal(0.15, 0.10, q),
+}
+bens = setores["AFH"] + setores["M"] + setores["C"] + setores["MD"] + setores["MN"]
+servicos_privados = crescimento_pib - bens - setores["GOV"]
+
+fred_payload.update(
+    {
+        "PCEPI": fred(meses, indice_precos(122, 0.026, 0.0012)),
+        "PCEPILFE": fred(meses, indice_precos(121, 0.028, 0.0010)),
+        "CPIUFDSL": fred(meses, indice_precos(330, 0.024, 0.0020)),
+        "CPIENGSL": fred(meses, indice_precos(280, 0.000, 0.0150)),
+        "CUSR0000SACL1E": fred(meses, indice_precos(160, 0.003, 0.0015)),
+        "CUSR0000SAH1": fred(meses, indice_precos(390, 0.045, 0.0015)),
+        "CUSR0000SASLE": fred(meses, indice_precos(410, 0.037, 0.0012)),
+        "U6RATE": fred(meses, np.clip(7.6 + np.cumsum(rng_eua.normal(0.01, 0.10, len(meses))), 6, 12)),
+        "ICSA": fred(semanas, np.clip(225_000 + np.cumsum(rng_eua.normal(0, 4_000, len(semanas))), 180_000, 320_000)),
+        "CIVPART": fred(meses, np.clip(62.6 + np.cumsum(rng_eua.normal(0, 0.05, len(meses))), 61.5, 63.5)),
+        "CES0500000003": fred(meses, 34.5 * 1.0033 ** np.arange(len(meses)) + rng_eua.normal(0, 0.03, len(meses))),
+        "JTSJOL": fred(meses, np.clip(8_000 - 60 * np.arange(len(meses)) + rng_eua.normal(0, 150, len(meses)), 6_000, 9_000)),
+        "UNEMPLOY": fred(meses, 6_800 + np.cumsum(rng_eua.normal(15, 60, len(meses)))),
+        "GDPC1": fred(trimestres_us, encadear(23_000, crescimento_pib)),
+        "PCECC96": fred(trimestres_us, encadear(15_600, crescimento["C"])),
+        "GPDIC1": fred(trimestres_us, encadear(4_200, crescimento["I"])),
+        "GCEC1": fred(trimestres_us, encadear(3_900, crescimento["G"])),
+        "EXPGSC1": fred(trimestres_us, encadear(2_550, crescimento["X"])),
+        "IMPGSC1": fred(trimestres_us, encadear(3_450, crescimento["M"])),
+        "DPCERY2Q224SBEA": fred(trimestres_us, contribuicao["C"]),
+        "A006RY2Q224SBEA": fred(trimestres_us, contribuicao["I"]),
+        "A822RY2Q224SBEA": fred(trimestres_us, contribuicao["G"]),
+        "A020RY2Q224SBEA": fred(trimestres_us, contribuicao["X"]),
+        "A021RY2Q224SBEA": fred(trimestres_us, contribuicao["M"]),
+        "CPGDPAI": fred(trimestres_us, crescimento_pib),
+        "CPGDPGPI": fred(trimestres_us, bens),
+        "CPGDPAFH": fred(trimestres_us, setores["AFH"]),
+        "CPGDPU": fred(trimestres_us, setores["U"]),
+        "CPGDPC": fred(trimestres_us, setores["C"]),
+        "CPGDPMD": fred(trimestres_us, setores["MD"]),
+        "CPGDPMN": fred(trimestres_us, setores["MN"]),
+        # Volume de cada setor: crescimento = contribuição / participação no PIB.
+        "VAQIAFH": fred(trimestres_us, encadear(105, setores["AFH"] / 0.009)),
+        "VAQIM": fred(trimestres_us, encadear(135, setores["M"] / 0.013)),
+        "VAQIC": fred(trimestres_us, encadear(104, setores["C"] / 0.042)),
+        "VAQIMA": fred(trimestres_us, encadear(112, (setores["MD"] + setores["MN"]) / 0.10)),
+        "RVASPI": fred(trimestres_us, encadear(17_300, servicos_privados / 0.70)),
+        "INDPRO": fred(meses, 102 + np.cumsum(rng_eua.normal(0.03, 0.40, len(meses)))),
+        "IPMAN": fred(meses, 100 + np.cumsum(rng_eua.normal(0.02, 0.45, len(meses)))),
+    }
+)
 (DESTINO / "us_macro.json").write_text(json.dumps(fred_payload), encoding="utf-8")
 print(f"us_macro.json: {len(fred_payload)} séries")
 

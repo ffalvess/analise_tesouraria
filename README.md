@@ -77,6 +77,7 @@ testar e demonstrar. Regere-os com `python scripts/gerar_fixtures.py`.
 | **Balança comercial** | Exportação, importação, saldo, e o descasamento entre saldo registrado e dólares internalizados |
 | **Focus** | A trajetória das revisões, a dispersão entre analistas, Focus contra Top 5 e contra a curva |
 | **Inflação, emprego e atividade** | Os dois países lado a lado, no mesmo recorte |
+| **Macro EUA** | Inflação (CPI e PCE, núcleos, momento de 3 e 6 meses, composição), mercado de trabalho (U-3 e U-6, payroll, seguro-desemprego, regra de Sahm, vagas por desempregado, salários) e o PIB pela ótica da despesa (consumo, investimento, governo, exportações, importações) e da produção (agropecuária, indústria, serviços) |
 | **Comunicação e research** | Discursos do BCB e do Fed com score de tom, feeds públicos e os seus PDFs locais |
 
 ### Duas decisões metodológicas que valem explicar
@@ -107,7 +108,7 @@ um diferencial nulo.
 | `focus` | Banco Central (Olinda) — Focus e Top 5 | não |
 | `comex` | Comex Stat / MDIC — balança detalhada | não |
 | `ibge_sidra` | IBGE — IPCA e desocupação (PNAD) | não |
-| `us_macro` | FRED — CPI, desemprego, payroll, Fed Funds e as cestas do dólar | **sim** |
+| `us_macro` | FRED — inflação, mercado de trabalho, PIB pela despesa e por setor (BEA), produção industrial, Fed Funds e as cestas do dólar | **sim** |
 | `speeches` | Fed (RSS) e BCB (feed JSON) | não |
 | `research` | Feeds públicos + `data/research_pdfs/` | não |
 
@@ -166,6 +167,14 @@ informe `since = 2015-01-01`.
 o resultado de `tesouraria status` e verifique que houve um commit em
 `data/snapshots/`. A partir daí o workflow roda sozinho todo dia útil às 20h
 (23h UTC), depois do fechamento no Brasil e nos Estados Unidos.
+
+A coleta diária pede os últimos sete dias, mas **cada série do FRED e do SGS
+recomeça da sua última observação gravada**, menos uma folga de revisão
+(`revisao_dias` em `config/sources.yaml`). Sem isso, séries mensais e
+trimestrais nunca entrariam: o CPI de agosto é datado de 1º de agosto e sai em
+meados de setembro, quando "sete dias atrás" já é setembro. Série acrescentada
+ao YAML busca o histórico inteiro sozinha na coleta seguinte — não é preciso
+repetir a carga inicial.
 
 Duas fontes se comportam diferente no backfill: **ANBIMA e B3 publicam um
 arquivo por pregão**, então coletá-las desde 2015 seriam milhares de
@@ -292,7 +301,7 @@ Uma fonte que falha não derruba as outras nem o aplicativo: o erro fica em
 
 ```bash
 ruff check src tests scripts     # lint
-pytest -q                        # 183 testes, todos offline
+pytest -q                        # 265 testes, todos offline
 pytest --cov=tesouraria          # com cobertura
 ```
 
@@ -300,7 +309,7 @@ Nenhum teste toca a rede nem o banco do usuário. Eles cobrem os parsers de cada
 fonte contra as fixtures, a conversão de convenção de taxa com valores
 calculados à mão, a interpolação, os diferenciais, o tom, a idempotência da
 gravação, a ida e volta dos snapshots (com verificação de determinismo por
-hash) e — via `streamlit.testing` — a renderização real das onze telas, incluindo
+hash) e — via `streamlit.testing` — a renderização real das doze telas, incluindo
 a hidratação automática a partir dos Parquet.
 
 O GitHub Actions roda lint e testes a cada push, no mesmo `requirements.txt`
@@ -322,8 +331,8 @@ src/tesouraria/
   queries.py      camada única de leitura
   cli.py          tesouraria ingest | status | snapshot | serve
   sources/        uma fonte por arquivo (fetch e parse separados)
-  analytics/      curve, differentials, fxflow, tone
-  ui/             app.py, charts.py e as dez páginas
+  analytics/      curve, differentials, fxflow, tone, macro_eua
+  ui/             app.py, charts.py e as onze páginas
 data/
   fixtures/       amostras sintéticas (versionadas)
   snapshots/      dados reais em Parquet, atualizados pelo Actions
@@ -335,7 +344,8 @@ data/
 
 Inclua o código em `config/sources.yaml` e rode a ingestão. Nenhuma alteração
 de código é necessária — a nova série aparece na aba *Todas as séries* da
-página de macro.
+página de macro, e no aplicativo publicado entra com o histórico inteiro na
+coleta diária seguinte.
 
 ```yaml
 bcb_sgs:

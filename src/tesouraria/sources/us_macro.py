@@ -14,10 +14,12 @@ import datetime as dt
 import json
 import logging
 
+import duckdb
 import pandas as pd
 
+from tesouraria import db
 from tesouraria.settings import get_settings
-from tesouraria.sources.base import Source
+from tesouraria.sources.base import Source, inicio_da_coleta
 from tesouraria.sources.validation import aceitar_serie
 
 logger = logging.getLogger(__name__)
@@ -36,9 +38,13 @@ class UsMacroSource(Source):
             return "FRED_API_KEY não configurada; defina-a no .env para coletar as séries dos EUA"
         return None
 
+    def prepare(self, con: duckdb.DuckDBPyConnection) -> None:
+        self._ultimas = db.ultimas_datas(con, "fred")
+
     def collect(self, since: dt.date | None = None) -> pd.DataFrame:
         cfg = self.config
-        inicio = since or INICIO_PADRAO
+        ultimas = getattr(self, "_ultimas", {})
+        revisao = int(cfg.get("revisao_dias", 0))
 
         fixture_payload = None
         if self.offline:
@@ -47,6 +53,7 @@ class UsMacroSource(Source):
         quadros: list[pd.DataFrame] = []
         for serie in cfg.get("series", []):
             serie_id = serie["serie_id"]
+            inicio = inicio_da_coleta(since, ultimas.get(serie_id), INICIO_PADRAO, revisao)
             try:
                 if fixture_payload is not None:
                     payload = fixture_payload.get(serie_id, {})
