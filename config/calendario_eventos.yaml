@@ -1,0 +1,50 @@
+# Agenda de eventos que costumam mover o USD/BRL.
+#
+# Três formas de declarar um evento:
+#   regra: semanal   → `dia_semana` (0 = segunda … 4 = sexta)
+#   regra: mensal    → `ordem` e `dia_semana` (ex.: primeira sexta do mês)
+#   regra: datas     → lista explícita `datas: [AAAA-MM-DD, ...]`
+#
+# `hora` é a hora local no `fuso` indicado (padrão America/Sao_Paulo); a tela
+# converte tudo para o horário de Brasília. `importancia` vai de 1 a 3.
+#
+# `verificar: true` marca datas e regras que NÃO foram conferidas contra o
+# calendário oficial de quem publica (BCB, IBGE, BLS, BEA, Fed, USDA, Conab,
+# Tesouro). A tela mostra o selo "a confirmar" nesses itens. Fontes oficiais:
+#   BCB (Copom/atas):      https://www.bcb.gov.br/publicacoes/calendarioreunioescopom
+#   IBGE (IPCA/IPCA-15):   https://www.ibge.gov.br/calendario-de-divulgacoes
+#   BLS (payroll/CPI):     https://www.bls.gov/schedule/
+#   BEA (PCE):             https://www.bea.gov/news/schedule
+#   Fed (FOMC/atas):       https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+#   USDA (WASDE):          https://www.usda.gov/oce/commodity/wasde
+#   Conab (safras):        https://www.conab.gov.br/info-agro/safras
+#
+# Feriados: eventos brasileiros que caem em feriado nacional são omitidos; a
+# regra não tenta adivinhar a remarcação (ex.: CFTC na semana de Thanksgiving).
+
+eventos:
+  # ------------------------------------------------------------ semanais
+  - { nome: "Boletim Focus",                 regiao: BR, importancia: 2, regra: semanal, dia_semana: 0, hora: "08:25" }
+  - { nome: "Balança comercial semanal",     regiao: BR, importancia: 1, regra: semanal, dia_semana: 0, hora: "15:00" }
+  - { nome: "Fluxo cambial semanal (BCB)",   regiao: BR, importancia: 2, regra: semanal, dia_semana: 2, hora: "14:30" }
+  - { nome: "Pedidos de auxílio-desemprego", regiao: US, importancia: 2, regra: semanal, dia_semana: 3, hora: "08:30", fuso: America/New_York }
+  - { nome: "CFTC Commitments of Traders",   regiao: US, importancia: 1, regra: semanal, dia_semana: 4, hora: "15:30", fuso: America/New_York }
+
+  # ------------------------------------------------------------- mensais
+  # O BLS costuma divulgar o payroll na primeira sexta do mês, com exceções.
+  - { nome: "Payroll (Employment Situation)", regiao: US, importancia: 3, regra: mensal, ordem: 1, dia_semana: 4, hora: "08:30", fuso: America/New_York, verificar: true }
+
+  # ------------------------------------------------------ datas explícitas
+  # Datas abaixo são estimativas a confirmar no calendário oficial.
+  - { nome: "IPCA-15",                       regiao: BR, importancia: 2, regra: datas, hora: "09:00", verificar: true, datas: ["2026-11-26", "2026-12-17"] }
+  - { nome: "IPCA",                          regiao: BR, importancia: 3, regra: datas, hora: "09:00", verificar: true, datas: ["2026-12-10"] }
+  - { nome: "PCE (Personal Income and Outlays)", regiao: US, importancia: 3, regra: datas, hora: "08:30", fuso: America/New_York, verificar: true, datas: ["2026-11-25", "2026-12-23"] }
+  - { nome: "CPI",                           regiao: US, importancia: 3, regra: datas, hora: "08:30", fuso: America/New_York, verificar: true, datas: ["2026-12-10"] }
+  - { nome: "Ata do FOMC",                   regiao: US, importancia: 2, regra: datas, hora: "14:00", fuso: America/New_York, verificar: true, datas: ["2026-11-18"] }
+  - { nome: "Decisão do FOMC",               regiao: US, importancia: 3, regra: datas, hora: "14:00", fuso: America/New_York, verificar: true, datas: ["2026-12-09"] }
+  - { nome: "Decisão do Copom",              regiao: BR, importancia: 3, regra: datas, hora: "18:30", verificar: true, datas: ["2026-12-09"] }
+  - { nome: "Ata do Copom",                  regiao: BR, importancia: 2, regra: datas, hora: "08:00", verificar: true, datas: ["2026-11-10", "2026-12-15"] }
+  - { nome: "WASDE (USDA)",                  regiao: US, importancia: 2, regra: datas, hora: "12:00", fuso: America/New_York, verificar: true, datas: ["2026-12-10"] }
+  - { nome: "Levantamento de safra (Conab)", regiao: BR, importancia: 2, regra: datas, hora: "09:00", verificar: true, datas: ["2026-12-10"] }
+  - { nome: "Relatório bimestral de receitas e despesas", regiao: BR, importancia: 2, regra: datas, hora: "16:00", verificar: true, datas: ["2027-03-22"] }
+  - { nome: "Votação da LOA no Congresso",   regiao: BR, importancia: 2, regra: datas, hora: "10:00", verificar: true, datas: ["2026-12-17"] }

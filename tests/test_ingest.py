@@ -1,7 +1,7 @@
 """Testes de ponta a ponta da ingestão em modo offline.
 
 Exercitam o caminho completo — `collect` → `upsert` → `ingest_log` — para as
-doze fontes, o que é o mais próximo de uma execução real que se pode fazer sem
+catorze fontes, o que é o mais próximo de uma execução real que se pode fazer sem
 acesso à rede.
 """
 
@@ -12,11 +12,12 @@ import pytest
 from tesouraria import db, queries, sources
 
 
-def test_registro_tem_as_doze_fontes():
-    assert len(sources.REGISTRO) == 12
+def test_registro_tem_as_catorze_fontes():
+    assert len(sources.REGISTRO) == 14
     assert set(sources.REGISTRO) == {
         "tesouro_direto", "us_treasury", "anbima_ettj", "b3_di", "bcb_sgs",
-        "fx_flow", "focus", "comex", "ibge_sidra", "us_macro", "speeches", "research",
+        "fx_flow", "focus", "comex", "comex_pesos", "ibge_sidra", "us_macro", "yahoo",
+        "speeches", "research",
     }
 
 
@@ -28,7 +29,7 @@ def test_criar_fonte_desconhecida():
 def test_todas_as_fontes_ingerem_sem_erro(ambiente_ingerido):
     status = db.status_report().set_index("fonte")
 
-    assert len(status) == 12
+    assert len(status) == 14
     com_erro = status[status["status"] == "erro"]
     assert com_erro.empty, f"fontes com erro: {list(com_erro.index)}"
     assert (status["modo"] == "fixture").all()

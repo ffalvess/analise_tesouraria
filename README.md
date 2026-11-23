@@ -77,6 +77,23 @@ testar e demonstrar. Regere-os com `python scripts/gerar_fixtures.py`.
 | **Focus** | A trajetória das revisões, a dispersão entre analistas, Focus contra Top 5 e contra a curva |
 | **Inflação, emprego e atividade** | Os dois países lado a lado, no mesmo recorte |
 | **Comunicação e research** | Discursos do BCB e do Fed com score de tom, feeds públicos e os seus PDFs locais |
+| **Câmbio USD/BRL** | Por que o dólar se mexeu hoje: painel do dia, cesta de commodities Brasil, atribuição diária a DXY, emergentes e commodities (o resíduo é o "componente Brasil"), flags de regime e agenda dos próximos 10 dias úteis |
+
+### A aba de câmbio (USD/BRL)
+
+Atribuição e contexto, não previsão. O retorno log diário do USD/BRL é
+decomposto em constante, três fatores ortogonalizados em ordem fixa — DXY; cesta
+EM (MXN, CLP, COP, ZAR) residualizada contra o DXY; cesta de commodities Brasil
+residualizada contra os dois — e um resíduo, o "componente Brasil". OLS em
+numpy (`analytics/ols.py`), coeficientes estimados na janela que termina na
+sessão anterior (padrão 60), de modo que constante + contribuições + resíduo
+reproduz exatamente a variação do dia. Os pesos da cesta de commodities são a
+participação de cada produto no valor exportado dos últimos 12 meses (Comex
+Stat), recalculada a cada coleta. Parâmetros, componentes e limiares das flags
+ficam em `config/cambio.yaml`; a agenda, em `config/calendario_eventos.yaml`.
+
+O calendário de dias úteis brasileiro (feriados nacionais, padrão ANBIMA) está
+em `calendario.py` e é o que conta as variações "em 5 e 21 dias úteis".
 
 ### Duas decisões metodológicas que valem explicar
 
@@ -106,7 +123,9 @@ um diferencial nulo.
 | `focus` | Banco Central (Olinda) — Focus e Top 5 | não |
 | `comex` | Comex Stat / MDIC — balança detalhada | não |
 | `ibge_sidra` | IBGE — IPCA e desocupação (PNAD) | não |
-| `us_macro` | FRED — CPI, desemprego, payroll, Fed Funds e as cestas do dólar | **sim** |
+| `us_macro` | FRED — CPI, desemprego, payroll, Fed Funds, as cestas do dólar, VIX e minério (FMI) | **sim** |
+| `yahoo` | Yahoo Finance (não oficial) — USD/BRL, DXY, MXN, CLP, COP, ZAR, VIX e futuros de commodities | não |
+| `comex_pesos` | Comex Stat / MDIC — exportação mensal por SH4, base dos pesos da cesta de commodities | não |
 | `speeches` | Fed (RSS) e BCB (feed JSON) | não |
 | `research` | Feeds públicos + `data/research_pdfs/` | não |
 
@@ -291,7 +310,7 @@ Uma fonte que falha não derruba as outras nem o aplicativo: o erro fica em
 
 ```bash
 ruff check src tests scripts     # lint
-pytest -q                        # 183 testes, todos offline
+pytest -q                        # 272 testes, todos offline
 pytest --cov=tesouraria          # com cobertura
 ```
 
@@ -299,7 +318,7 @@ Nenhum teste toca a rede nem o banco do usuário. Eles cobrem os parsers de cada
 fonte contra as fixtures, a conversão de convenção de taxa com valores
 calculados à mão, a interpolação, os diferenciais, o tom, a idempotência da
 gravação, a ida e volta dos snapshots (com verificação de determinismo por
-hash) e — via `streamlit.testing` — a renderização real das dez telas, incluindo
+hash) e — via `streamlit.testing` — a renderização real das onze telas, incluindo
 a hidratação automática a partir dos Parquet.
 
 O GitHub Actions roda lint e testes a cada push, no mesmo `requirements.txt`
@@ -320,9 +339,12 @@ src/tesouraria/
   snapshots.py    Parquet particionado por mês, para publicar
   queries.py      camada única de leitura
   cli.py          tesouraria ingest | status | snapshot | serve
+  calendario.py   dias úteis brasileiros (feriados nacionais/ANBIMA)
+  agenda.py       eventos de config/calendario_eventos.yaml
   sources/        uma fonte por arquivo (fetch e parse separados)
-  analytics/      curve, differentials, fxflow, tone
-  ui/             app.py, charts.py e as nove páginas
+  analytics/      curve, differentials, fxflow, tone, ols, atribuicao,
+                  commodities, painel_cambio
+  ui/             app.py, charts.py e as dez páginas
 data/
   fixtures/       amostras sintéticas (versionadas)
   snapshots/      dados reais em Parquet, atualizados pelo Actions

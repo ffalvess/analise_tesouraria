@@ -11,6 +11,7 @@ from tesouraria.sources.b3_di import B3DiSource
 from tesouraria.sources.base import IngestResult, Source
 from tesouraria.sources.bcb_sgs import BcbSgsSource
 from tesouraria.sources.comex import ComexSource
+from tesouraria.sources.comex_pesos import ComexPesosSource
 from tesouraria.sources.focus import FocusSource
 from tesouraria.sources.fx_flow import FxFlowSource
 from tesouraria.sources.ibge_sidra import IbgeSidraSource
@@ -19,6 +20,7 @@ from tesouraria.sources.speeches import SpeechesSource
 from tesouraria.sources.tesouro_direto import TesouroDiretoSource
 from tesouraria.sources.us_macro import UsMacroSource
 from tesouraria.sources.us_treasury import USTreasurySource
+from tesouraria.sources.yahoo import YahooSource
 
 REGISTRO: dict[str, type[Source]] = {
     "tesouro_direto": TesouroDiretoSource,
@@ -29,8 +31,10 @@ REGISTRO: dict[str, type[Source]] = {
     "fx_flow": FxFlowSource,
     "focus": FocusSource,
     "comex": ComexSource,
+    "comex_pesos": ComexPesosSource,
     "ibge_sidra": IbgeSidraSource,
     "us_macro": UsMacroSource,
+    "yahoo": YahooSource,
     "speeches": SpeechesSource,
     "research": ResearchSource,
 }
@@ -45,6 +49,8 @@ TABELA_DA_FONTE: dict[str, str] = {
     "us_treasury": "curve_us",
     "bcb_sgs": "series_macro",
     "comex": "series_macro",
+    "comex_pesos": "series_macro",
+    "yahoo": "series_macro",
     "ibge_sidra": "series_macro",
     "us_macro": "series_macro",
     "fx_flow": "fx_flow",
@@ -88,6 +94,12 @@ def series_declaradas() -> set[str]:
     }
     # O Comex Stat monta os identificadores no próprio módulo, a partir do fluxo.
     declaradas |= {"comex_export", "comex_import", "comex_saldo"}
+    declaradas |= {str(s["ticker"]) for s in fontes.get("yahoo", {}).get("series", [])}
+    # Os SH4 da cesta de commodities vêm de `config/cambio.yaml`.
+    from tesouraria.analytics.commodities import serie_id_sh4
+    from tesouraria.sources.comex_pesos import codigos_sh4
+
+    declaradas |= {serie_id_sh4(c) for c in codigos_sh4()}
 
     return declaradas
 

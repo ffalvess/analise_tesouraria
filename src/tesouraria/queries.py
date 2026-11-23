@@ -92,6 +92,32 @@ def fontes_curva_br() -> pd.DataFrame:
         ).df()
 
 
+def curva_br_periodo(fonte: str, tipo: str = "pre", desde: dt.date | None = None) -> pd.DataFrame:
+    """Todos os vértices de uma curva brasileira desde uma data, para séries de prazo constante."""
+    filtro = "AND data_ref >= ?" if desde else ""
+    params: list = [fonte, tipo, *([desde] if desde else [])]
+    with connection(read_only=True) as con:
+        return con.execute(
+            f"""
+            SELECT data_ref, prazo_anos, taxa
+            FROM curve_br
+            WHERE fonte = ? AND tipo = ? {filtro}
+            ORDER BY data_ref, prazo_anos
+            """,
+            params,
+        ).df()
+
+
+def contagem_datas_curva_br(tipo: str = "pre") -> dict[str, int]:
+    """Quantas datas cada fonte tem de uma curva brasileira."""
+    with connection(read_only=True) as con:
+        linhas = con.execute(
+            "SELECT fonte, COUNT(DISTINCT data_ref) FROM curve_br WHERE tipo = ? GROUP BY fonte",
+            [tipo],
+        ).fetchall()
+    return {fonte: int(n) for fonte, n in linhas}
+
+
 def serie(serie_id: str | list[str], desde: dt.date | None = None) -> pd.DataFrame:
     ids = [serie_id] if isinstance(serie_id, str) else list(serie_id)
     if not ids:

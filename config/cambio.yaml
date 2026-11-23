@@ -1,0 +1,103 @@
+# Aba "Câmbio USD/BRL": séries, cestas, parâmetros do modelo e limiares.
+#
+# Tudo que a aba usa e que poderia mudar sem mexer em lógica mora aqui. Os
+# endpoints e as faixas plausíveis de cada série ficam em `sources.yaml`
+# (blocos `yahoo`, `comex_pesos`, `us_macro`, `bcb_sgs`), como nas demais fontes.
+#
+# Nada nesta aba é digitado à mão. CDS e intervenções do BC estão listados em
+# `lacunas` até haver fonte automática verificada.
+
+fuso: America/Sao_Paulo
+
+# ------------------------------------------------------------------ séries
+# `origem`: yahoo | sgs | fred | curve_us | curve_br
+# `variacao`: pct (preços e índices) | bps (taxas)
+# `tolerancia_du`: dias úteis (calendário BR) de atraso aceitos antes do selo
+#   "defasado". A coleta roda às 20h; durante o dia, a última observação é a de
+#   ontem, então 1 é o mínimo para série diária.
+series:
+  usdbrl:    { origem: yahoo, serie_id: "BRL=X",    rotulo: "USD/BRL à vista", unidade: "R$/US$", casas: 4, variacao: pct, horario: "último preço do dia (Yahoo, ~fechamento NY)", tolerancia_du: 1 }
+  ptax:      { origem: sgs,   serie_id: "1",        rotulo: "Ptax venda",      unidade: "R$/US$", casas: 4, variacao: pct, horario: "boletim de fechamento, ~13h", tolerancia_du: 1 }
+  dxy:       { origem: yahoo, serie_id: "DX-Y.NYB", rotulo: "DXY",             unidade: "índice", casas: 2, variacao: pct, horario: "fechamento ICE, NY", tolerancia_du: 1 }
+  ust2:      { origem: curve_us, prazo: 2.0,        rotulo: "Treasury 2 anos", unidade: "% a.a.", casas: 2, variacao: bps, horario: "par yield de fechamento (US Treasury)", tolerancia_du: 2 }
+  ust10:     { origem: curve_us, prazo: 10.0,       rotulo: "Treasury 10 anos", unidade: "% a.a.", casas: 2, variacao: bps, horario: "par yield de fechamento (US Treasury)", tolerancia_du: 2 }
+  vix:       { origem: yahoo, serie_id: "^VIX",     rotulo: "VIX",             unidade: "pontos", casas: 2, variacao: pct, horario: "fechamento Cboe, 16h15 ET", tolerancia_du: 1, reserva: { origem: fred, serie_id: "VIXCLS" } }
+  mxn:       { origem: yahoo, serie_id: "MXN=X",    rotulo: "USD/MXN",         unidade: "MXN/US$", casas: 4, variacao: pct, horario: "último preço do dia (Yahoo)", tolerancia_du: 1 }
+  clp:       { origem: yahoo, serie_id: "CLP=X",    rotulo: "USD/CLP",         unidade: "CLP/US$", casas: 2, variacao: pct, horario: "último preço do dia (Yahoo)", tolerancia_du: 1 }
+  cop:       { origem: yahoo, serie_id: "COP=X",    rotulo: "USD/COP",         unidade: "COP/US$", casas: 1, variacao: pct, horario: "último preço do dia (Yahoo)", tolerancia_du: 1 }
+  zar:       { origem: yahoo, serie_id: "ZAR=X",    rotulo: "USD/ZAR",         unidade: "ZAR/US$", casas: 4, variacao: pct, horario: "último preço do dia (Yahoo)", tolerancia_du: 1 }
+
+# Curva brasileira para o "DI longo" e a inclinação. Ordem de preferência das
+# fontes do próprio app; usa a primeira com ao menos `minimo_sessoes` datas.
+# A B3 (DI1) é a referência de mercado; o Tesouro Direto (prefixados) é a
+# única com histórico longo, mas suas taxas são do mercado de títulos, não DI.
+curva_br:
+  preferencia: [b3, anbima, tesouro]
+  tipo: pre
+  minimo_sessoes: 30
+  prazo_longo: 5.0
+  prazo_curto: 1.0
+  metodo: pchip
+  tolerancia_du: 2
+
+# ------------------------------------------------------------- cesta EM
+# Todos cotados como moeda local por dólar, igual ao USD/BRL: retorno
+# positivo = moeda emergente se depreciando.
+cesta_em:
+  componentes: [mxn, clp, cop, zar]
+  minimo_componentes: 3   # abaixo disso, o dia fica sem cesta
+
+# ------------------------------------------------ cesta de commodities Brasil
+# `sh4`: códigos do Sistema Harmonizado (4 dígitos) somados no Comex Stat.
+# `ticker`: futuro no Yahoo usado para o retorno diário.
+# Cobre não entra, por decisão de modelagem.
+commodities:
+  cobertura_minima: 0.5     # fração do peso que precisa ter cotação no dia
+  meses_pesos: 12
+  produtos:
+    petroleo:      { rotulo: "Petróleo (Brent)",  ticker: "BZ=F",  sh4: ["2709"],          ativo: true }
+    soja:          { rotulo: "Soja",              ticker: "ZS=F",  sh4: ["1201"],          ativo: true }
+    minerio_ferro: { rotulo: "Minério de ferro",  ticker: "TIO=F", sh4: ["2601"],          ativo: true, reserva_mensal: "PIORECRUSDM" }
+    milho:         { rotulo: "Milho",             ticker: "ZC=F",  sh4: ["1005"],          ativo: true }
+    acucar:        { rotulo: "Açúcar",            ticker: "SB=F",  sh4: ["1701"],          ativo: true }
+    cafe:          { rotulo: "Café",              ticker: "KC=F",  sh4: ["0901"],          ativo: true }
+    algodao:       { rotulo: "Algodão",           ticker: "CT=F",  sh4: ["5201"],          ativo: true }
+    # Opcionais, desligados por padrão. O boi gordo de Chicago (LE=F) é um proxy
+    # fraco da carne exportada pelo Brasil, e a celulose não tem futuro líquido
+    # no Yahoo: ligá-la só faz efeito quando houver um `ticker`.
+    carne_bovina:  { rotulo: "Carne bovina",      ticker: "LE=F",  sh4: ["0201", "0202"],  ativo: false }
+    celulose:      { rotulo: "Celulose",          ticker: null,    sh4: ["4703"],          ativo: false }
+  # Um componente diário com menos que isto de sessões recentes sai do índice
+  # (e a tela avisa). Pensado para o TIO=F, que tem histórico ralo no Yahoo.
+  minimo_sessoes_componente: 40
+  tolerancia_du: 2
+
+# ----------------------------------------------------------- atribuição
+atribuicao:
+  janela: 60                # dias úteis (sessões com todas as séries)
+  janelas_oferecidas: [40, 60, 120, 250]
+  sessoes_grafico: 20
+  historico_sessoes: 500    # quantas sessões calcular para betas e R² rolling
+
+flags:
+  estresse_z_residuo: 2.0   # z do resíduo ≥ +2 (real se depreciando por motivo local)
+  estresse_di_bps: 10.0     # e DI longo subindo ≥ 10 bps no dia
+  riskoff_vix_pct: 10.0     # VIX ≥ +10% no dia, com DXY em alta e cesta EM depreciando
+  choque_cmd_desvios: 2.0   # |f3| ≥ 2 desvios-padrão da janela
+
+# --------------------------------------------------------- atualização
+# O botão "atualizar" coleta de novo estas fontes para os últimos dias.
+atualizacao:
+  fontes: [yahoo, bcb_sgs, us_macro, us_treasury]
+  dias: 10
+
+# --------------------------------------------------------------- lacunas
+# Itens do painel sem fonte automática verificada. Aparecem na tela como
+# indisponíveis, com o motivo — nunca como número digitado.
+lacunas:
+  cds5:
+    rotulo: "CDS 5 anos Brasil"
+    motivo: "Sem fonte pública e automática verificada (não há entrada manual por decisão de projeto)."
+  intervencoes:
+    rotulo: "Intervenções do BC"
+    motivo: "Sem fonte automática verificada para leilões à vista, swap e linha; a avaliar na Fase 2."

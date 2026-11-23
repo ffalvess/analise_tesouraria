@@ -229,6 +229,50 @@ sources:
       - { serie_id: "DTWEXAFEGS", nome: "Dólar — economias avançadas", unidade: "índice", faixa: [50, 200] }
       - { serie_id: "DTWEXEMEGS", nome: "Dólar — emergentes",        unidade: "índice", faixa: [50, 250] }
 
+      # Aba de câmbio (config/cambio.yaml). VIXCLS é a reserva do ^VIX do Yahoo;
+      # PIORECRUSDM (FMI, mensal) é só contexto quando o TIO=F não tem dado.
+      - { serie_id: "VIXCLS",      nome: "VIX (Cboe, via FRED)",          unidade: "pontos",  faixa: [5, 90] }
+      - { serie_id: "PIORECRUSDM", nome: "Minério de ferro (FMI, mensal)", unidade: "US$/t",  faixa: [20, 300] }
+
+  # ------------------------------------------------ cotações diárias (Yahoo)
+  yahoo:
+    descricao: "Câmbio, DXY, VIX e futuros de commodities (Yahoo Finance, não oficial)"
+    url_template: "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+    fixture: "yahoo.json"
+    # Intraday: a série é diária, mas o botão "atualizar" da aba de câmbio
+    # precisa enxergar o preço do dia.
+    ttl_horas: 1
+    # O Yahoo recusa com 429 clientes sem cara de navegador.
+    user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    verificar: true
+    series:
+      - { ticker: "BRL=X",    nome: "USD/BRL (Yahoo)",          unidade: "R$/US$",   faixa: [2, 12] }
+      - { ticker: "DX-Y.NYB", nome: "DXY (ICE)",                unidade: "índice",   faixa: [70, 140] }
+      - { ticker: "MXN=X",    nome: "USD/MXN",                  unidade: "MXN/US$",  faixa: [10, 30] }
+      - { ticker: "CLP=X",    nome: "USD/CLP",                  unidade: "CLP/US$",  faixa: [500, 1400] }
+      - { ticker: "COP=X",    nome: "USD/COP",                  unidade: "COP/US$",  faixa: [2500, 6000] }
+      - { ticker: "ZAR=X",    nome: "USD/ZAR",                  unidade: "ZAR/US$",  faixa: [8, 30] }
+      - { ticker: "^VIX",     nome: "VIX (Cboe)",               unidade: "pontos",   faixa: [5, 90] }
+      - { ticker: "BZ=F",     nome: "Brent (ICE)",              unidade: "US$/bbl",  faixa: [10, 200] }
+      - { ticker: "ZS=F",     nome: "Soja (CBOT)",              unidade: "US¢/bu",   faixa: [400, 2500] }
+      - { ticker: "TIO=F",    nome: "Minério de ferro 62% (SGX)", unidade: "US$/t",  faixa: [30, 300] }
+      - { ticker: "ZC=F",     nome: "Milho (CBOT)",             unidade: "US¢/bu",   faixa: [150, 1000] }
+      - { ticker: "SB=F",     nome: "Açúcar nº 11 (ICE)",       unidade: "US¢/lb",   faixa: [5, 50] }
+      - { ticker: "KC=F",     nome: "Café arábica (ICE)",       unidade: "US¢/lb",   faixa: [50, 600] }
+      - { ticker: "CT=F",     nome: "Algodão nº 2 (ICE)",       unidade: "US¢/lb",   faixa: [30, 250] }
+      - { ticker: "LE=F",     nome: "Boi gordo (CME)",          unidade: "US¢/lb",   faixa: [60, 350] }
+
+  # --------------------------------- exportação por produto (pesos da cesta)
+  comex_pesos:
+    descricao: "Exportação mensal por SH4 (Comex Stat) — pesos da cesta de commodities"
+    url: "https://api-comexstat.mdic.gov.br/general"
+    fixture: "comex_pesos.json"
+    ttl_horas: 24
+    verificar: true
+    # US$ FOB mensal por SH4. Petróleo bruto e soja passam de US$ 5 bi em meses
+    # fortes; o teto pega erro de unidade (centavos, milhares).
+    faixa: [0, 20000000000]
+
 # Grade padrão de vértices (em anos) usada para tornar as curvas comparáveis.
 grade_padrao: [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0]
 
